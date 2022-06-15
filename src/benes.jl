@@ -1,18 +1,18 @@
 struct BenesNetwork{T}
-    ops::Vector{Tuple{MBitVector{T},Int}}
+    ops::Vector{Tuple{T,Int}}
 end
 
 function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearrange::Bool=true) where T
     n = length(perm)
     isbitstype(T) && n ≤ bitsize(T) || throw(OverflowError("Permutation is too long for Type $T"))
-    # ispow2(n) || throw(ArgumentError("Permutation must be exactly a power of 2"))
+    isperm(perm) || throw(ArgumentError("Input vector is not a permutation"))
 
     # Pad permutation vector
     p = vcat(perm, n+1:bitsize(T))
 
-    shiftset = [2^i for i in 0:Int(log2(bitsize(T)÷2))]
-    !rearrange && return BenesNetwork(_ops(T, p, shifts))
+    shiftset = reverse([2^i for i in 0:trailing_zeros(bitsize(T)÷2)])
 
+    !rearrange && return BenesNetwork(_ops(T, p, shiftset))
     ops = nothing
     for shifts in permutations(shiftset)
         newops = _ops(T, p, shifts)
@@ -25,7 +25,7 @@ function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearran
 end
 
 function Base.show(io::IO, ::MIME"text/plain", net::BenesNetwork)
-    println("$(typeof(net)) with $(length(net.ops)) deltaswaps")
+    println("$(typeof(net)) with $(length(net.ops)) δ-swaps")
     return nothing
 end
 
@@ -37,7 +37,7 @@ function _ops(::Type{T}, p::AbstractVector{Int}, shifts) where T
     masks[m] = masks[m] ⊻ masks[m+1]
     popat!(masks, m+1)
     deltas = [shifts; reverse(shifts[begin:end-1])]
-    return [(m, δ) for (m, δ) in zip(masks, deltas) if any(m)]
+    return [(chunk(m), δ) for (m, δ) in zip(masks, deltas) if any(m)]
 end
 
 function _masks(::Type{T}, p::AbstractVector{Int}, shifts) where T
@@ -57,16 +57,9 @@ function _masks(::Type{T}, p::AbstractVector{Int}, shifts) where T
     return masks
 end
 
-function _conjugate(ind::Int, partition::AbstractVector, shift::Int)
-    ax = first(axes(partition))
-    @boundscheck checkbounds(ax, ind)
-    ret = partition[ind] ? ind - shift : ind + shift
-    @boundscheck checkbounds(ax, ret)
-    return ret
-end
-
-
 function _stagemasks(::Type{T}, p::AbstractVector, shift::Int) where T
+    # All nodes must be repartitioned in two sets with the same number of elements
+    # encoded with {true|false}, corresponding to which partition they are destined to
     n = length(p)
     ax = first(axes(p))
     p̄ = invperm(p)
@@ -79,9 +72,7 @@ function _stagemasks(::Type{T}, p::AbstractVector, shift::Int) where T
     mask_forward = MBitVector{T}(zero(T))
     mask_backward = MBitVector{T}(zero(T))
 
-
-    # All nodes must be repartitioned in two sets with the same number of elements
-    # encoded with {true|false}, corresponding to which partition they are destined to
+    # Heuristic: start from the smallest index which is not moved
     i = 1
     for (j, pⱼ) in enumerate(p)
         if pⱼ === j
@@ -126,11 +117,21 @@ function _stagemasks(::Type{T}, p::AbstractVector, shift::Int) where T
             i = j′
         end
     end
+
     # Normalize mask
     mask_forward = (circshift(mask_forward, -shift) | mask_forward) & ~partition
     mask_backward = (circshift(mask_backward, -shift) | mask_backward) & ~partition
     return mask_forward, mask_backward
 end
+
+function _conjugate(ind::Int, partition::AbstractVector, shift::Int)
+    ax = first(axes(partition))
+    @boundscheck checkbounds(ax, ind)
+    ret = partition[ind] ? ind - shift : ind + shift
+    @boundscheck checkbounds(ax, ret)
+    return ret
+end
+
 
 function bitpermute(net::BenesNetwork{T}, x::T) where T
     return foldl(net.ops; init=x) do x′, (mask, shift)
@@ -145,12 +146,12 @@ function invbitpermute(net::BenesNetwork{T}, x::T) where T
 end
 
 # Swaps bits in x selected by mask m with ones to the left by an amount `shift`
+deltaswap(x::T, m::MBitVector{T}, shift::Int) where T = deltaswap(x, chunk(m), shift)
+
 function deltaswap(x::Unsigned, m::Unsigned, shift::Int)
     t = ((x >> shift) ⊻ x) & m
     return x ⊻ t ⊻ (t << shift)
 end
-
-deltaswap(x::T, m::MBitVector{T}, shift::Int) where T = deltaswap(x, chunk(m), shift)
 
 function arraydeltaswap(x::AbstractVector, m::MBitVector, shift::Int)
     @assert length(x) === length(m)
@@ -162,6 +163,3 @@ function arraydeltaswap(x::AbstractVector, m::MBitVector, shift::Int)
     end
     return y
 end
-
-# Internal debugging
-bitvec(x) = reverse(bitstring(x))

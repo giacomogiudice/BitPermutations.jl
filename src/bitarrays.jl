@@ -52,6 +52,9 @@ end
 
 Base.IndexStyle(::Type{<:MBitVector}) = IndexLinear()
 
+# Comparison
+Base.isequal(m₁::MBitVector{T}, m₂::MBitVector{T}) where T = chunk(m₁) == chunk(m₂)
+
 # Initializers
 Base.zero(m::MBitVector{T}) where T = MBitVector{T}(zero(T))
 Base.similar(m::MBitVector{T}) where T = zero(m)
@@ -61,7 +64,7 @@ Base.any(m::MBitVector) = !iszero(chunk(m))
 Base.all(m::MBitVector) = chunk(m) === ~zero(T)
 Base.sum(m::MBitVector) = count_ones(chunk(m))
 
-# # Conversions
+# Conversions
 Base.convert(::Type{T}, m::MBitVector) where T<:Integer = convert(T, chunk(m))
 
 # Fast iteration
@@ -77,7 +80,6 @@ function Base.iterate(m::MBitVector{T}, state::Tuple{T,Int}) where T
     return val, (rest, n+1)
 end
 
-# _peel(a::Integer) = (r = a >> 1; return (Bool(r & one(a)), r))
 _peel(a::Integer) = (Bool(a & one(a)), a >> 1)
 
 # Logical operations
