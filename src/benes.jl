@@ -1,5 +1,5 @@
-struct BenesNetwork{T}
-    ops::Vector{Tuple{T,Int}}
+struct BenesNetwork{T} <: PermutationNetwork{T}
+    params::Vector{Tuple{T,Int}}
 end
 
 function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearrange::Bool=true) where T
@@ -13,23 +13,23 @@ function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearran
     shiftset = reverse([2^i for i in 0:trailing_zeros(bitsize(T)÷2)])
 
     !rearrange && return BenesNetwork(_ops(T, p, shiftset))
-    ops = nothing
+    params = nothing
     for shifts in permutations(shiftset)
-        newops = _ops(T, p, shifts)
-        verbose && @info "Permutation $(shifts) requires $(length(newops)) operations"
-        if isnothing(ops) || length(newops) < length(ops)
-            ops = newops
+        newparams = _params(T, p, shifts)
+        verbose && @info "Permutation $(shifts) requires $(length(newparams)) operations"
+        if isnothing(params) || length(newparams) < length(params)
+            params = newparams
         end
     end
-    return BenesNetwork(ops)
+    return BenesNetwork(params)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", net::BenesNetwork)
-    println("$(typeof(net)) with $(length(net.ops)) δ-swaps")
+    println("$(typeof(net)) with $(length(net.params)) operations")
     return nothing
 end
 
-function _ops(::Type{T}, p::AbstractVector{Int}, shifts) where T
+function _params(::Type{T}, p::AbstractVector{Int}, shifts) where T
     # Compute masks
     masks = _masks(T, p, shifts)
     # Merge innermost masks
@@ -48,8 +48,8 @@ function _masks(::Type{T}, p::AbstractVector{Int}, shifts) where T
         mask_forward, mask_backward = _stagemasks(T, target, shift)
         masks[ind], masks[end-(ind-1)] = mask_forward, mask_backward
 
-        p_forward = arraydeltaswap(source, mask_forward, shift)
-        p_backward = arraydeltaswap(target, mask_backward, shift)
+        p_forward = deltaswap(source, mask_forward, shift)
+        p_backward = deltaswap(target, mask_backward, shift)
 
         # New permutation for next stage
         target = p_forward[p_backward]
@@ -133,27 +133,26 @@ function _conjugate(ind::Int, partition::AbstractVector, shift::Int)
 end
 
 
-function bitpermute(net::BenesNetwork{T}, x::T) where T
-    return foldl(net.ops; init=x) do x′, (mask, shift)
+function bitpermute(x::T, net::BenesNetwork{T}) where T
+    return foldl(net.params; init=x) do x′, (mask, shift)
         return deltaswap(x′, mask, shift)
     end
 end
 
-function invbitpermute(net::BenesNetwork{T}, x::T) where T
-    return foldl(Iterators.reverse(net.ops); init=x) do x′, (mask, shift)
+function invbitpermute(x::T, net::BenesNetwork{T}) where T
+    return foldl(Iterators.reverse(net.params); init=x) do x′, (mask, shift)
         return deltaswap(x′, mask, shift)
     end
 end
 
 # Swaps bits in x selected by mask m with ones to the left by an amount `shift`
-deltaswap(x::T, m::MBitVector{T}, shift::Int) where T = deltaswap(x, chunk(m), shift)
-
-function deltaswap(x::Unsigned, m::Unsigned, shift::Int)
+@inline function deltaswap(x::Unsigned, m::Unsigned, shift::Int)
     t = ((x >> shift) ⊻ x) & m
     return x ⊻ t ⊻ (t << shift)
 end
 
-function arraydeltaswap(x::AbstractVector, m::MBitVector, shift::Int)
+# Slow for arrays
+function deltaswap(x::AbstractVector, m::MBitVector, shift::Int)
     @assert length(x) === length(m)
     y = copy(x)
     for (i, mᵢ) in enumerate(m)

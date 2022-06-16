@@ -6,7 +6,7 @@ using Random
 Random.seed!(42)
 
 # For permutations it is more natural to think of bits from left to right
-bitvec(x) = reverse(bitstring(x)) 
+bitstr(x) = reverse(bitstring(x)) 
 
 # Test types
 testtypes = (UInt8, UInt16, UInt32, UInt64, UInt128)
@@ -18,7 +18,7 @@ testtypes = (UInt8, UInt16, UInt32, UInt64, UInt128)
     v = @inferred MBitVector(x)
     @test @inferred MBitVector{T}(x for x in v) == v
     @test @inferred all(((i, x),) -> v[i] === x, enumerate(v))
-    bitvec(x) == string(v)
+    bitstr(x) == string(v)
 
     y = rand(T)
     w = MBitVector(y)
@@ -42,7 +42,7 @@ end
 @testset "Primitives for type $T" for T in testtypes
     # Simple deltaswaps
     a, b, c, d, e = T(1), T(2), T(3), T(5), T(12)
-    @test [bitvec(x)[1:4] for x ∈ (a, b, c, d, e)] == ["1000","0100","1100","1010","0011"]
+    @test [bitstr(x)[1:4] for x ∈ (a, b, c, d, e)] == ["1000","0100","1100","1010","0011"]
     @test (@inferred deltaswap(a, a, 1)) === b     # 1̄000... -> 0100...
     @test (@inferred deltaswap(d, b, 1)) === c     # 10̄10... -> 1100...
     @test (@inferred deltaswap(c, c, 2)) === e     # 1̄1̄00... -> 0011...
@@ -52,7 +52,7 @@ end
         x = rand(T)
         s = rand(1:4)
         m = rand(T); m = (m & ~(m << s)) >> s
-        v = @inferred BitPermutations.arraydeltaswap(MBitVector(x), MBitVector(m), s)
+        v = @inferred deltaswap(MBitVector(x), MBitVector(m), s)
         v′ = @inferred MBitVector(deltaswap(x, m, s))
         @test v == v′
         @test (@inferred deltaswap(deltaswap(x, m, s), m, s)) === x
@@ -60,7 +60,7 @@ end
 
     # GRP swaps
     a, b, c, d, e = T(1), T(2), T(3), T(6), T(14)
-    @test [bitvec(x)[1:4] for x ∈ (a, b, c, d, e)] == ["1000","0100","1100","0110","0111"]
+    @test [bitstr(x)[1:4] for x ∈ (a, b, c, d, e)] == ["1000","0100","1100","0110","0111"]
     @test (@inferred grpswap(a, ~c)) === a     # 1̄000... -> 1000...
     @test (@inferred grpswap(b, ~b)) === a     # 1̄000... -> 1000...
     @test (@inferred grpswap(d, ~e)) === c     # 1̄11̄1... -> 1100...
@@ -69,11 +69,11 @@ end
     for _ in 1:20
         x = rand(T)
         m = rand(T)
-        v = @inferred BitPermutations.arraygrpswap(MBitVector(x), MBitVector(m))
+        v = @inferred grpswap(MBitVector(x), MBitVector(m))
         v′ = @inferred MBitVector(grpswap(x, m))
         @test v == v′
         @test (@inferred invgrpswap(grpswap(x, m), m)) === x
-        v′ = @inferred BitPermutations.arrayinvgrpswap(v, MBitVector(m))
+        v′ = @inferred invgrpswap(v, MBitVector(m))
         @test v′ == MBitVector(x)
     end
 end
@@ -87,8 +87,8 @@ end
         net = BenesNetwork{T}(p)
         for _ in 1:100
             x = rand(T)
-            @test bitvec(x)[p′] === bitvec(@inferred bitpermute(net, x))
-            @test bitvec(x)[invperm(p′)] === bitvec(@inferred invbitpermute(net, x))
+            @test bitstr(x)[p′] === bitstr(@inferred bitpermute(x, net))
+            @test bitstr(x)[invperm(p′)] === bitstr(@inferred invbitpermute(x, net))
         end
     end
 end
@@ -102,8 +102,8 @@ end
         net = GRPNetwork{T}(p)
         for _ in 1:100
             x = rand(T)
-            @test bitvec(x)[p′] === bitvec(@inferred bitpermute(net, x))
-            @test bitvec(x)[invperm(p′)] === bitvec(@inferred invbitpermute(net, x))
+            @test bitstr(x)[p′] === bitstr(@inferred bitpermute(x, net))
+            @test bitstr(x)[invperm(p′)] === bitstr(@inferred invbitpermute(x, net))
         end
     end
 end
