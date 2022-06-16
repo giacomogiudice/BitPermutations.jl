@@ -31,7 +31,7 @@ testtypes = (UInt8, UInt16, UInt32, UInt64, UInt128)
     @test convert(T, circshift(v, i)) === bitrotate(x, i)
 
     # Assignment
-    for _ in 1:10
+    for _ in 1:20
         i = rand(axes(x, 1))
         b = rand(Bool)
         v[i] = b

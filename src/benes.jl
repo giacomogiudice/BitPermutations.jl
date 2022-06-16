@@ -8,7 +8,7 @@ function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearran
     isperm(perm) || throw(ArgumentError("Input vector is not a permutation"))
 
     # Pad permutation vector
-    p = vcat(perm, n+1:bitsize(T))
+    p = [perm; n+1:bitsize(T)]
 
     shiftset = reverse([2^i for i in 0:trailing_zeros(bitsize(T)÷2)])
 
@@ -65,12 +65,12 @@ function _stagemasks(::Type{T}, p::AbstractVector, shift::Int) where T
     p̄ = invperm(p)
 
     # Keeps track of visited nodes
-    visited = MBitVector{T}(zero(T))
+    visited = MBitVector(zero(T))
     # Partition of next stage
     partition = MBitVector{T}(c for _ in 1:(n÷2shift) for c in 0:1 for _ in 1:shift)
     # Instantiate masks
-    mask_forward = MBitVector{T}(zero(T))
-    mask_backward = MBitVector{T}(zero(T))
+    mask_forward = MBitVector(zero(T))
+    mask_backward = MBitVector(zero(T))
 
     # Heuristic: start from the smallest index which is not moved
     i = 1
@@ -146,13 +146,13 @@ function invbitpermute(x::T, net::BenesNetwork{T}) where T
 end
 
 # Swaps bits in x selected by mask m with ones to the left by an amount `shift`
-@inline function deltaswap(x::Unsigned, m::Unsigned, shift::Int)
+@inline function deltaswap(x::T, m::T, shift::Int) where T<:Integer
     t = ((x >> shift) ⊻ x) & m
     return x ⊻ t ⊻ (t << shift)
 end
 
 # Slow for arrays
-function deltaswap(x::AbstractVector, m::MBitVector, shift::Int)
+function deltaswap(x::AbstractVector, m::AbstractVector{Bool}, shift::Int)
     @assert length(x) === length(m)
     y = copy(x)
     for (i, mᵢ) in enumerate(m)
