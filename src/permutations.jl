@@ -19,8 +19,11 @@ function BitPermutation{T}(p::AbstractVector{Int}; type::Type=_default_type(T)) 
     return BitPermutation{T}(alg) 
 end
 
-function Base.show(io::IO, perm::BitPermutation)
-    print(typeof(perm))
+Base.show(io::IO, ::BitPermutation{T}) where T = print(io, "BitPermutation{$T}")
+
+function Base.show(io::IO, ::MIME"text/plain", perm::BitPermutation{T}) where T
+    println(io, "BitPermutation{$T} with algorithm:")
+    print(io, " ", perm.alg)
     return nothing
 end
 
@@ -34,7 +37,7 @@ end
 Base.adjoint(perm::AbstractPermutation) = AdjointBitPermutation(perm)
 
 @inline bitpermute(x::T, P::AdjointBitPermutation{T}) where T = invbitpermute(x, P.parent)
-@inline invbitpermute(x::T, P::AdjointBitPermutation{T}) where T = invbitpermute(x, P.parent)
+@inline invbitpermute(x::T, P::AdjointBitPermutation{T}) where T = bitpermute(x, P.parent)
 
 struct CompiledBitPermutation{T,F<:Function,F̄<:Function} <: AbstractPermutation{T}
     regular::F

@@ -18,14 +18,23 @@ testtypes = (UInt8, UInt16, UInt32, UInt64, UInt128)
     x = rand(T)
     @test (@inferred bitsize(x)) === 8*sizeof(x)
 
+    # Construction
     v = @inferred MBitVector(x)
     @test @inferred MBitVector{T}(x for x in v) == v
     @test @inferred all(((i, x),) -> v[i] === x, enumerate(v))
     bitstr(x) == string(v)
 
+    # Comparison
+    w = MBitVector(v)
+    @test (@inferred w == v) && (@inferred isequal(w, v))
+    v₀ = MBitVector(zero(T))
+    @test (v ≥ v₀) && !any(v₀) && !all(v₀)
+    @test any(v) ? (v₀ < v) : (v === v₀)
+    @test (@inferred sum(v)) === count_ones(x) && (@inferred sum(.~v)) === count_zeros(x)
+
+    # Logic
     y = rand(T)
     w = MBitVector(y)
-
     @test convert(T, ~v) === ~x
     @test convert(T, v & w) === x & y
     @test convert(T, v | w) === x | y
@@ -117,10 +126,23 @@ end
         p = randperm(n)
         P₁ = BitPermutation{T}(p; type=BenesNetwork)
         P₂ = BitPermutation{T}(p; type=GRPNetwork)
-        for _ in 1:100
+
+        # Make sure printing returns something
+        buf = IOBuffer()
+        show(buf, P₁)
+        @test !isempty(String(take!(buf)))
+        show(buf, P₂)
+        @test !isempty(String(take!(buf)))
+        show(buf, "text/plain", P₁)
+        @test !isempty(String(take!(buf)))
+        show(buf, "text/plain", P₂)
+        @test !isempty(String(take!(buf)))
+
+        for _ in 1:20
             x = rand(T)
             @test P₁(x) === P₂(x) === bitpermute(x, P₁) === bitpermute(x, P₂)
             @test P₁'(x) === P₂'(x) === invbitpermute(x, P₁) === invbitpermute(x, P₂)
+            @test P₁(x) === invbitpermute(x, P₁') === P₂(x) === invbitpermute(x, P₂')
         end
     end
 end

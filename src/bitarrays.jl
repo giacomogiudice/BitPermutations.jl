@@ -31,6 +31,7 @@ mutable struct MBitVector{T<:Base.BitInteger} <: AbstractArray{Bool,1}
 end
 
 MBitVector(input::T) where T<:Base.BitInteger = MBitVector{T}(input)
+MBitVector(input::MBitVector{T}) where T = MBitVector{T}(chunk(input))
 
 # Getter
 @inline chunk(m::MBitVector) = m.chunk
@@ -56,7 +57,9 @@ end
 Base.IndexStyle(::Type{<:MBitVector}) = IndexLinear()
 
 # Comparison
-Base.isequal(m₁::MBitVector{T}, m₂::MBitVector{T}) where T = chunk(m₁) == chunk(m₂)
+Base.isequal(m₁::MBitVector{T}, m₂::MBitVector{T}) where T = m₁ == m₂
+Base.:(==)(m₁::MBitVector{T}, m₂::MBitVector{T}) where T = chunk(m₁) == chunk(m₂)
+Base.isless(m₁::MBitVector{T}, m₂::MBitVector{T}) where T = chunk(m₁) < chunk(m₂)
 
 # Initializers
 Base.zero(m::MBitVector{T}) where T = MBitVector{T}(zero(T))
@@ -64,7 +67,7 @@ Base.similar(m::MBitVector{T}) where T = zero(m)
 
 # Fast Base array operations
 Base.any(m::MBitVector) = !iszero(chunk(m))
-Base.all(m::MBitVector) = chunk(m) === ~zero(T)
+Base.all(m::MBitVector) = chunk(m) === ~zero(chunk(m))
 Base.sum(m::MBitVector) = count_ones(chunk(m))
 
 # Conversions

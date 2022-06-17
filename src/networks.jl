@@ -27,10 +27,7 @@ function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearran
     return BenesNetwork(params)
 end
     
-function Base.show(io::IO, net::BenesNetwork)
-    print("$(typeof(net)) with $(length(net)) operations")
-    return nothing
-end
+Base.show(io::IO, net::BenesNetwork) = print(io, "$(typeof(net)) with $(length(net.params)) operations")
 
 function _params(::Type{T}, p::AbstractVector{Int}, shifts) where T
     # Compute masks
@@ -202,10 +199,7 @@ function GRPNetwork{T}(perm::AbstractVector{Int}) where T
     return GRPNetwork{T}([(m, count_zeros(m), ~m) for m in Iterators.map(chunk, masks)])
 end
 
-function Base.show(io::IO, net::GRPNetwork)
-    print("$(typeof(net)) with $(length(net)) operations")
-    return nothing
-end
+Base.show(io::IO, net::GRPNetwork) = print(io, "$(typeof(net)) with $(length(net.params)) operations")
 
 function bitpermute(x::T, net::GRPNetwork{T}) where T
     return foldl(net.params; init=x) do x′, args
