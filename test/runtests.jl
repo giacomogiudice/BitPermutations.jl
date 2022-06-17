@@ -8,6 +8,9 @@ Random.seed!(42)
 # For permutations it is more natural to think of bits from left to right
 bitstr(x) = reverse(bitstring(x)) 
 
+# Check if using BMI2
+@info "USE_BMI2 = $(BitPermutations.USE_BMI2), ENV[\"BP_USE_BMI2\"] = $(get(ENV, "BP_USE_BMI2", nothing))"
+
 # Test types
 testtypes = (UInt8, UInt16, UInt32, UInt64, UInt128)
 

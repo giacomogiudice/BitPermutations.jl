@@ -132,3 +132,6 @@ On such machines you may want to experiment which method is faster and possibly 
 
 Fallback operations are implemented but are typically much slower then butterfly operations.
 The construction of the masks follows the algorithm in: R. Lee, Z. Shi, X. Yang, *Efficient permutation instructions for fast software cryptography*, [IEEE Micro](https://doi.org/10.1109/40.977759) (2001); which is well explained [here](https://programming.sirrida.de/bit_perm.html#lee_sag).
+
+# Compatibility
+This package is compatible with Julia 1.5 and above.

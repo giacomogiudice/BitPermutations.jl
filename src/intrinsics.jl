@@ -4,7 +4,12 @@ function has_bmi2()
     return !iszero(CPUInfo[2] & 0x100)
 end
 
-const USE_BMI2 = parse(Bool, get(ENV, "BP_USE_BMI2", "true")) && has_bmi2()
+function use_bmi2()
+    flag = get(ENV, "BP_USE_BMI2", true)
+    return (flag isa Bool ? flag : parse(Bool, flag)) && has_bmi2()
+end
+
+const USE_BMI2 = use_bmi2()
 
 pdep(x::T, m::T) where T<:Union{UInt32,UInt64} = USE_BMI2 ? _pdep(x, m) : _pdep_fallback(x, m)
 pdep(x::T, m::T) where T = _pdep_fallback(x, m)
