@@ -107,3 +107,27 @@ end
         end
     end
 end
+
+@testset "BitPermutation{$T}" for T in testtypes
+    for _ in 1:10
+        n = rand(1:bitsize(T))
+        p = randperm(n)
+        P₁ = BitPermutation{T}(p; type=BenesNetwork)
+        P₂ = BitPermutation{T}(p; type=GRPNetwork)
+        for _ in 1:100
+            x = rand(T)
+            @test P₁(x) === P₂(x) === bitpermute(x, P₁) === bitpermute(x, P₂)
+            @test P₁'(x) === P₂'(x) === invbitpermute(x, P₁) === invbitpermute(x, P₂)
+        end
+    end
+end
+
+@testset "CompiledBitPermutation{$T}" for T in testtypes
+    P₁ = @eval @bitpermutation $T (2, 6, 5, 8, 4, 7, 1, 3)
+    P₂ = BitPermutation{T}([2, 6, 5, 8, 4, 7, 1, 3])
+    for _ in 1:100
+        x = rand(T)
+        @test P₁(x) === P₂(x) === bitpermute(x, P₁) === bitpermute(x, P₂)
+        @test P₁'(x) === P₂'(x) === invbitpermute(x, P₁) === invbitpermute(x, P₂)
+    end
+end

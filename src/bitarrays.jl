@@ -1,19 +1,20 @@
 """
     MBitVector{T} <: AbstractArray{Bool,1}
 
-A mutable, statically-sized bit vector encoded in the bits in `T`.
+A mutable, statically-sized bit vector encoded in the bits in an element of type
+`T<:Base.BitInteger`.
 
 An `MBitVector` should behave similarly to a `BitVector`, but it is slightly faster as 
 the size is known at compile-time to be `bitsize(T)`.
 """
-mutable struct MBitVector{T} <: AbstractArray{Bool,1}
+mutable struct MBitVector{T<:Base.BitInteger} <: AbstractArray{Bool,1}
     chunk::T
 
-    MBitVector(input::T) where T<:Integer = new{T}(input)
+    # Constructor for Integers
+    MBitVector{T}(input::T) where T<:Base.BitInteger = new{T}(input)
     
-    function MBitVector{T}(input::A) where {T<:Integer,A}
-        # Input is the data chunk
-        isprimitivetype(A) && isbits(input) && return new{T}(convert(T, input))
+    # Constructor for iterable inputs
+    function MBitVector{T}(input) where {T<:Base.BitInteger}
         # Iterate over input
         a = zero(T)
         n = 0
@@ -28,6 +29,8 @@ mutable struct MBitVector{T} <: AbstractArray{Bool,1}
         return new{T}(a)
     end
 end
+
+MBitVector(input::T) where T<:Base.BitInteger = MBitVector{T}(input)
 
 # Getter
 @inline chunk(m::MBitVector) = m.chunk

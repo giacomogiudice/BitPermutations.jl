@@ -3,26 +3,19 @@ module BitPermutations
 using Combinatorics
 
 export MBitVector
-export PermutationNetwork, BenesNetwork, GRPNetwork
+export PermutationAlgorithm, BenesNetwork, GRPNetwork
+export BitPermutation, AdjointBitPermutation, CompiledBitPermutation
+
 export bitsize, deltaswap, grpswap, invgrpswap
 export bitpermute, invbitpermute
 
+export @bitpermutation
 
-
-"""
-    bitsize(T::DataType)
-    bitsize(obj::T)
-
-Number of bits in the binary representations of `T`.
-"""
-bitsize(::Type{T}) where T = 8*sizeof(T)
-bitsize(::T) where T = bitsize(T)
-
-abstract type PermutationNetwork{T} end
-
-include("bitarrays.jl")
 include("intrinsics.jl")
-include("benes.jl")
-include("grp.jl")
+include("primitives.jl")
+include("bitarrays.jl")
+include("networks.jl")
+include("permutations.jl")
+include("macros.jl")
 
 end # module

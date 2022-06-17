@@ -1,18 +1,21 @@
-struct BenesNetwork{T} <: PermutationNetwork{T}
+abstract type PermutationAlgorithm{T} end
+
+struct BenesNetwork{T} <: PermutationAlgorithm{T}
     params::Vector{Tuple{T,Int}}
 end
 
 function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearrange::Bool=true) where T
     n = length(perm)
-    isbitstype(T) && n ≤ bitsize(T) || throw(OverflowError("Permutation is too long for Type $T"))
+    n ≤ bitsize(T) || throw(OverflowError("Permutation is too long for Type $T"))
     isperm(perm) || throw(ArgumentError("Input vector is not a permutation"))
 
     # Pad permutation vector
     p = [perm; n+1:bitsize(T)]
 
+    # Use `trailing_zeros` to compute the log2 quickly
     shiftset = reverse([2^i for i in 0:trailing_zeros(bitsize(T)÷2)])
 
-    !rearrange && return BenesNetwork(_ops(T, p, shiftset))
+    !rearrange && return BenesNetwork(_params(T, p, shiftset))
     params = nothing
     for shifts in permutations(shiftset)
         newparams = _params(T, p, shifts)
@@ -23,9 +26,9 @@ function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearran
     end
     return BenesNetwork(params)
 end
-
-function Base.show(io::IO, ::MIME"text/plain", net::BenesNetwork)
-    println("$(typeof(net)) with $(length(net.params)) operations")
+    
+function Base.show(io::IO, net::BenesNetwork)
+    print("$(typeof(net)) with $(length(net)) operations")
     return nothing
 end
 
@@ -84,7 +87,7 @@ function _stagemasks(::Type{T}, p::AbstractVector, shift::Int) where T
     # Encodes the beginning of each cycle
     i₀ = i
     
-    while !isnothing(i)
+    @inbounds while !isnothing(i)
         # Heuristic to have fewer masks: try to not reshuffle indices
         color = partition[i₀]
 
@@ -127,7 +130,7 @@ end
 function _conjugate(ind::Int, partition::AbstractVector, shift::Int)
     ax = first(axes(partition))
     @boundscheck checkbounds(ax, ind)
-    ret = partition[ind] ? ind - shift : ind + shift
+    @inbounds ret = partition[ind] ? ind - shift : ind + shift
     @boundscheck checkbounds(ax, ret)
     return ret
 end
@@ -145,20 +148,73 @@ function invbitpermute(x::T, net::BenesNetwork{T}) where T
     end
 end
 
-# Swaps bits in x selected by mask m with ones to the left by an amount `shift`
-@inline function deltaswap(x::T, m::T, shift::Int) where T<:Integer
-    t = ((x >> shift) ⊻ x) & m
-    return x ⊻ t ⊻ (t << shift)
+struct GRPNetwork{T} <: PermutationAlgorithm{T}
+    params::Vector{Tuple{T,Int,T}}
 end
 
-# Slow for arrays
-function deltaswap(x::AbstractVector, m::AbstractVector{Bool}, shift::Int)
-    @assert length(x) === length(m)
-    y = copy(x)
-    for (i, mᵢ) in enumerate(m)
-        if !iszero(mᵢ)
-            y[i+shift], y[i] = x[i], x[i+shift]
+# Algorithm explained in https://programming.sirrida.de/bit_perm.html#lee_sag
+function GRPNetwork{T}(perm::AbstractVector{Int}) where T
+    n = length(perm)
+    n ≤ bitsize(T) || throw(OverflowError("Permutation is too long for Type $T"))
+    isperm(perm) || throw(ArgumentError("Input vector is not a permutation"))
+    USE_BMI2 || @warn "Not using BMI2 instructions, performance may be limited" maxlog=1
+
+    # Pad permutation vector
+    p = [collect(perm); n+1:bitsize(T)]
+
+    # Build partial lists
+    lists = [Int[]]
+    k = 1
+    for (i, pᵢ) in enumerate(p)
+        # Go to next list if previous item is larger
+        if !isempty(lists[k]) && lists[k][end] > pᵢ
+            push!(lists, Int[])
+            k += 1
         end
+        push!(lists[k], pᵢ)
     end
-    return y
+
+    # Merge lists pairwise until there is only one left
+    masks = MBitVector[]
+    while length(lists) > 1
+        # Make sure `lists` has an even size
+        isodd(length(lists)) && push!(lists, Int[])
+        nhalf = length(lists) ÷ 2
+        mergedlists = Vector{Vector{Int}}(undef, nhalf)
+        partialmasks = Vector{BitVector}(undef, nhalf)
+        
+        # Sequentially merge the lists
+        for k in 1:nhalf
+            l, r = lists[k], lists[k+nhalf]
+            mergedlists[k] = [l; r]
+            partialmasks[k] = [falses(length(l)); trues(length(r))]
+            inds = sortperm(mergedlists[k])
+            mergedlists[k] = mergedlists[k][inds]
+            partialmasks[k] = partialmasks[k][inds]
+        end
+
+        # Push mask to front since order of masks should be reversed
+        lists = mergedlists
+        pushfirst!(masks, MBitVector{T}(vcat(partialmasks...)))
+    end
+    @assert issorted(first(lists))
+
+    return GRPNetwork{T}([(m, count_zeros(m), ~m) for m in Iterators.map(chunk, masks)])
+end
+
+function Base.show(io::IO, net::GRPNetwork)
+    print("$(typeof(net)) with $(length(net)) operations")
+    return nothing
+end
+
+function bitpermute(x::T, net::GRPNetwork{T}) where T
+    return foldl(net.params; init=x) do x′, args
+        return grpswap(x′, args...)
+    end
+end
+
+function invbitpermute(x::T, net::GRPNetwork{T}) where T
+    return foldl(Iterators.reverse(net.params); init=x) do x′, args
+        return invgrpswap(x′, args...)
+    end
 end
