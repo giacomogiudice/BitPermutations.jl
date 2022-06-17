@@ -1,4 +1,13 @@
 # BitPermutations.jl
+[![CI][ci-img]][ci-url]
+[![codecov][codecov-img]][codecov-url]
+
+[ci-img]: https://github.com/giacomogiudice/BitPermutations.jl/workflows/CI/badge.svg
+[ci-url]: https://github.com/giacomogiudice/BitPermutations.jl/actions?query=workflow%3ACI
+
+[codecov-img]: https://codecov.io/gh/giacomogiudice/BitPermutations.jl/branch/master/graph/badge.svg?token=G71Y9FQH6K
+[codecov-url]: https://codecov.io/gh/giacomogiudice/BitPermutations.jl?token=G71Y9FQH6K
+
 Efficient routines for repeated bit permutations.
 
 ## Introduction
