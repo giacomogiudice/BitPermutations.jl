@@ -13,7 +13,7 @@ function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearran
     p = [perm; n+1:bitsize(T)]
 
     # Use `trailing_zeros` to compute the log2 quickly
-    shiftset = reverse([2^i for i in 0:trailing_zeros(bitsize(T)÷2)])
+    shiftset = reverse!([2^i for i in 0:trailing_zeros(bitsize(T)÷2)])
 
     !rearrange && return BenesNetwork(_params(T, p, shiftset))
     params = nothing
