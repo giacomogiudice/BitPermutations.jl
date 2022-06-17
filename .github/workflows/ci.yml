@@ -30,3 +30,8 @@ jobs:
 
       - name: Run Tests
         uses: julia-actions/julia-runtest@latest
+
+      - name: Upload Coverage
+        uses: julia-actions/julia-uploadcodecov@latest
+        env:
+          CODECOV_TOKEN: ${{secrets.CODECOV_TOKEN}}
