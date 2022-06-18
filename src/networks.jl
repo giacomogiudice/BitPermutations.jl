@@ -10,59 +10,68 @@ function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearran
     isperm(perm) || throw(ArgumentError("Input vector is not a permutation"))
 
     # Pad permutation vector
-    p = [perm; n+1:bitsize(T)]
+    p = [collect(perm); n+1:bitsize(T)]
 
     # Use `trailing_zeros` to compute the log2 quickly
-    shiftset = reverse!([2^i for i in 0:trailing_zeros(bitsize(T)÷2)])
+    shifts = reverse!([2^i for i in 0:trailing_zeros(bitsize(T)÷2)])
 
-    !rearrange && return BenesNetwork(_params(T, p, shiftset))
-    params = nothing
-    for shifts in permutations(shiftset)
-        newparams = _params(T, p, shifts)
-        verbose && @info "Permutation $(shifts) requires $(length(newparams)) operations"
-        if isnothing(params) || length(newparams) < length(params)
-            params = newparams
-        end
-    end
-    return BenesNetwork(params)
-end
-    
-Base.show(io::IO, net::BenesNetwork) = print(io, "$(typeof(net)) with $(length(net.params)) operations")
+    # Initialize masks
+    masks = Vector{MBitVector{T}}(undef, 2*length(shifts) - 1)
 
-function _params(::Type{T}, p::AbstractVector{Int}, shifts) where T
-    # Compute masks
-    masks = _masks(T, p, shifts)
-    # Merge innermost masks
-    m = length(shifts)
-    masks[m] = masks[m] ⊻ masks[m+1]
-    popat!(masks, m+1)
-    deltas = [shifts; reverse(shifts[begin:end-1])]
-    return [(chunk(m), δ) for (m, δ) in zip(masks, deltas) if any(m)]
-end
+    # Fill with garbage so they are all computed the first time
+    prevshifts = zeros(Int, length(shifts))
+    bestshifts = zeros(Int, length(shifts))
+    bestmasks = similar(masks)
+    bestscore = -1
 
-function _masks(::Type{T}, p::AbstractVector{Int}, shifts) where T
-    masks = Vector{MBitVector{T}}(undef, 2*length(shifts))
+    # Loop over all possible permutations
+    iterator = rearrange ? permutations(shifts) : (shifts,)
     source = collect(1:length(p))
-    target = collect(p)
-    for (ind, shift) in enumerate(shifts)
-        mask_forward, mask_backward = _stagemasks(T, target, shift)
-        masks[ind], masks[end-(ind-1)] = mask_forward, mask_backward
+    for shifts in iterator
+        cached = true
+        target = p
+        # Populate masks with first arrangement of shifts
+        for (index, shift) in enumerate(shifts)
+            # Avoid recomputing masks if same shift as before
+            if !(cached && shift == prevshifts[index])
+                _setstagemasks!(masks, shifts, target, index)
+                cached = false
+            end
+            # Compute permutation for next stage
+            if index ≠ lastindex(shifts)
+                mask_forward, mask_backward = masks[index], masks[end-index+1]
+                p_forward = deltaswap(source, mask_forward, shift)
+                p_backward = deltaswap(target, mask_backward, shift)
+                target = p_forward[p_backward]
+            end
+        end
+        # Score based on number of zero masks
+        score = sum(!any, masks)
+        verbose && @info "Ordering $shifts has score: $score ($(length(masks) - score) ops)"
+        if score > bestscore
+            bestscore = score
+            bestshifts = copy(shifts)
+            bestmasks = copy(masks)
+        end
 
-        p_forward = deltaswap(source, mask_forward, shift)
-        p_backward = deltaswap(target, mask_backward, shift)
-
-        # New permutation for next stage
-        target = p_forward[p_backward]
+        prevshifts = copy(shifts)
     end
-    return masks
+
+    # Extract parameters
+    shifts = bestshifts
+    masks = bestmasks
+    deltas = [shifts; reverse!(shifts[begin:end-1])]
+
+    return BenesNetwork([(chunk(m), δ) for (m, δ) in zip(masks, deltas) if any(m)])
 end
 
-function _stagemasks(::Type{T}, p::AbstractVector, shift::Int) where T
+function _setstagemasks!(masks::AbstractVector{MBitVector{T}}, shifts::AbstractVector{Int}, p::AbstractVector{Int}, index::Int) where T
     # All nodes must be repartitioned in two sets with the same number of elements
     # encoded with {true|false}, corresponding to which partition they are destined to
     n = length(p)
-    ax = first(axes(p))
+    ax = axes(p, 1)
     p̄ = invperm(p)
+    shift = shifts[index]
 
     # Keeps track of visited nodes
     visited = MBitVector(zero(T))
@@ -121,7 +130,17 @@ function _stagemasks(::Type{T}, p::AbstractVector, shift::Int) where T
     # Normalize mask
     mask_forward = (circshift(mask_forward, -shift) | mask_forward) & ~partition
     mask_backward = (circshift(mask_backward, -shift) | mask_backward) & ~partition
-    return mask_forward, mask_backward
+    
+    # Set masks
+    if index ≠ lastindex(shifts)
+        masks[index] = mask_forward
+        masks[end-index+1] = mask_backward
+    else
+        # Last index: merge the innermost masks
+        masks[index] = mask_forward ⊻ mask_backward
+    end
+    
+    return nothing
 end
 
 function _conjugate(ind::Int, partition::AbstractVector, shift::Int)
@@ -132,6 +151,7 @@ function _conjugate(ind::Int, partition::AbstractVector, shift::Int)
     return ret
 end
 
+Base.show(io::IO, net::BenesNetwork) = print(io, "$(typeof(net)) with $(length(net.params)) operations")
 
 function bitpermute(x::T, net::BenesNetwork{T}) where T
     return foldl(net.params; init=x) do x′, (mask, shift)
