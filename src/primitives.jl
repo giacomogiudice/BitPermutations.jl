@@ -37,6 +37,8 @@ end
 Moves the bits in `x` selected by the mask `m` to the left, the rest get moved to the right.
 The `shift` (number of 0s in m) and inverse mask `m̄` can be provided so they don't have to be recomputed.
 The `AbstractArray` version is not optimized to be fast.
+
+See also [`invgrpswap`](@ref).
 """
 @inline function grpswap(x::T, m::T, shift::Int=count_zeros(m), m̄::T=~m) where T<:Base.BitInteger
     return pext(x, m) << shift | pext(x, m̄)
@@ -51,6 +53,8 @@ end
     invgrpswap(x::AbstractVector, m::AbstractVector{Bool})
 
 Performs the inverse operation of `grpswap`.
+
+See also [`grpswap`](@ref).
 """
 @inline function invgrpswap(x::T, m::T, shift::Int=count_zeros(m), m̄::T=~m) where T<:Base.BitInteger
     return pdep(x >> shift, m) | pdep(x, m̄)

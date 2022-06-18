@@ -1,3 +1,12 @@
+"""
+    @bitpermutation T list
+    @bitpermutation(T, list)
+
+Generates as `CompiledBitPermutation{T}` from the permutation defined in `list`, which can be a `Vector` or a `Tuple`.
+The permutation is first computed as a `BitPermutation`, and the corresponding instructions for `bitpermute` and `invbitpermute` are converted to code, which the compiler will hopefully optimize.
+
+See also [`CompiledBitPermutation`](@ref), `BitPermutation`](@ref), [`bitpermute`](@ref), [`invbitpermute`](@ref).
+"""
 macro bitpermutation(typesymb, permexpr)
     # Parse input arguments
     typeof(typesymb) ∈ (Symbol, DataType) || 

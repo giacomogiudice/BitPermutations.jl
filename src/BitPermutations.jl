@@ -3,8 +3,8 @@ module BitPermutations
 using Combinatorics
 
 export MBitVector
-export PermutationAlgorithm, BenesNetwork, GRPNetwork
-export BitPermutation, AdjointBitPermutation, CompiledBitPermutation
+export BitPermutationAlgorithm, BenesNetwork, GRPNetwork
+export AbstractBitPermutation, BitPermutation, AdjointBitPermutation, CompiledBitPermutation
 
 export bitsize, deltaswap, grpswap, invgrpswap
 export bitpermute, invbitpermute

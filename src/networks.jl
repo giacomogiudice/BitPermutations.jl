@@ -1,6 +1,16 @@
-abstract type PermutationAlgorithm{T} end
+"""
+    BitPermutationAlgorithm{T}
 
-struct BenesNetwork{T} <: PermutationAlgorithm{T}
+Abstract type for all bit permutation algorithms.
+"""
+abstract type BitPermutationAlgorithm{T} end
+
+"""
+    BenesNetwork{T}
+
+Represents a Beneš network, which is a series of `deltaswap` operations with specified shifts and masks.
+"""
+struct BenesNetwork{T} <: BitPermutationAlgorithm{T}
     params::Vector{Tuple{T,Int}}
 end
 
@@ -139,7 +149,7 @@ function _setstagemasks!(masks::AbstractVector{MBitVector{T}}, shifts::AbstractV
         # Last index: merge the innermost masks
         masks[index] = mask_forward ⊻ mask_backward
     end
-    
+
     return nothing
 end
 
@@ -165,7 +175,12 @@ function invbitpermute(x::T, net::BenesNetwork{T}) where T
     end
 end
 
-struct GRPNetwork{T} <: PermutationAlgorithm{T}
+"""
+    GRPNetwork{T}
+
+Represents a GRP network, which is a series of `grpswap` operations with specified shifts and masks.
+"""
+struct GRPNetwork{T} <: BitPermutationAlgorithm{T}
     params::Vector{Tuple{T,Int,T}}
 end
 
@@ -179,7 +194,7 @@ function GRPNetwork{T}(perm::AbstractVector{Int}) where T
     # Pad permutation vector
     p = [collect(perm); n+1:bitsize(T)]
 
-    # Build partial lists
+    # Build partial lists of indices
     lists = [Int[]]
     k = 1
     for (i, pᵢ) in enumerate(p)

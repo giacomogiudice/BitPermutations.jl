@@ -1,9 +1,21 @@
+"""
+    has_bmi2()
+
+Tests if the processor supports hardware BMI2 instructions.
+"""
 function has_bmi2()
     CPUInfo = zeros(Int32, 4)
+    # Explanation:
+    # https://stackoverflow.com/questions/32214843/compiler-macro-to-detect-bmi2-instruction-set
     ccall(:jl_cpuidex, Cvoid, (Ptr{Cint}, Cint, Cint), CPUInfo, 7, 0)
     return !iszero(CPUInfo[2] & 0x100)
 end
 
+"""
+    use_bmi2()
+
+Used to set `USE_BMI2` flag at precompilation.
+"""
 function use_bmi2()
     flag = get(ENV, "BP_USE_BMI2", true)
     return (flag isa Bool ? flag : parse(Bool, flag)) && has_bmi2()
@@ -11,9 +23,25 @@ end
 
 const USE_BMI2 = use_bmi2()
 
+"""
+    pdep(x::T, m::T)
+
+Place first bits of `x` at locations specified by `m` in the return value.
+Opposite operation of `pdep`.
+
+See also [`pext`](@ref).
+"""
 pdep(x::T, m::T) where T<:Union{UInt32,UInt64} = USE_BMI2 ? _pdep(x, m) : _pdep_fallback(x, m)
 pdep(x::T, m::T) where T = _pdep_fallback(x, m)
 
+"""
+    pext(x::T, m::T)
+
+Select bits of `x` with `m` and place them at the beginning of the return value.
+Opposite operation of `pdep`.
+
+See also [`pdep`](@ref).
+"""
 pext(x::T, m::T) where T<:Union{UInt32,UInt64} = USE_BMI2 ? _pext(x, m) : _pext_fallback(x, m)
 pext(x::T, m::T) where T = _pext_fallback(x, m)
 
