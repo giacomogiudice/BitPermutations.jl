@@ -137,22 +137,30 @@ function _setstagemasks!(masks::AbstractVector{MBitVector{T}}, shifts::AbstractV
         end
     end
 
-    # Normalize mask
-    mask_forward = (circshift(mask_forward, -shift) | mask_forward) & ~partition
-    mask_backward = (circshift(mask_backward, -shift) | mask_backward) & ~partition
-    
+    # Normalize mask (move masking bits to MSB position)
+    mask_forward = _normalize_mask(mask_forward, partition, shift)
+    mask_backward = _normalize_mask(mask_backward, partition, shift)
+
     # Set masks
     if index ≠ lastindex(shifts)
         masks[index] = mask_forward
         masks[end-index+1] = mask_backward
     else
         # Last index: merge the innermost masks
-        masks[index] = mask_forward ⊻ mask_backward
+        masks[index] = mask_forward .⊻ mask_backward
     end
 
     return nothing
 end
 
+# Moves bits in mask to MSB position 
+function _normalize_mask(mask::MBitVector{T}, partition::MBitVector{T}, shift::Int) where T
+    m = chunk(mask)
+    p = chunk(partition)
+    return MBitVector{T}(((m >> shift) | m) & ~p)
+end
+
+# Finds index shifted up or down by `shift`
 function _conjugate(ind::Int, partition::AbstractVector, shift::Int)
     ax = first(axes(partition))
     @boundscheck checkbounds(ax, ind)

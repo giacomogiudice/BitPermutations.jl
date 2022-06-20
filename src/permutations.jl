@@ -3,7 +3,7 @@
 
 Abstract bit permutation supertype.
 """
-abstract type AbstractBitPermutation{T<:Base.BitInteger} end
+abstract type AbstractBitPermutation{T} end
 
 (perm::AbstractBitPermutation{T})(x::T) where T = bitpermute(x, perm)
 

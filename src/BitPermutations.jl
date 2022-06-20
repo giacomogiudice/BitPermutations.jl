@@ -1,8 +1,8 @@
 module BitPermutations
 
 using Combinatorics
+using Base: Broadcast
 
-export MBitVector
 export BitPermutationAlgorithm, BenesNetwork, GRPNetwork
 export AbstractBitPermutation, BitPermutation, AdjointBitPermutation, CompiledBitPermutation
 

@@ -1,6 +1,8 @@
 using BitPermutations
-using Test
+using BitPermutations: MBitVector
+using BitIntegers
 using Random
+using Test
 
 # Set seed for reproducibility
 Random.seed!(42)
@@ -11,10 +13,12 @@ bitstr(x) = reverse(bitstring(x))
 # Check if using BMI2
 @info "USE_BMI2 = $(BitPermutations.USE_BMI2), ENV[\"BP_USE_BMI2\"] = $(get(ENV, "BP_USE_BMI2", nothing))"
 
-# Test types
-testtypes = (UInt8, UInt16, UInt32, UInt64, UInt128)
+# Test types from Base
+base_types = (UInt8, UInt16, UInt32, UInt64, UInt128)
+# Types defined in BitIntegers
+custom_types = (UInt256, UInt512, UInt1024)
 
-@testset "MBitVector{$T}" for T in testtypes
+@testset "MBitVector{$T}" for T in (base_types..., custom_types...)
     x = rand(T)
     @test (@inferred bitsize(x)) === 8*sizeof(x)
 
@@ -30,17 +34,21 @@ testtypes = (UInt8, UInt16, UInt32, UInt64, UInt128)
     v₀ = MBitVector(zero(T))
     @test (v ≥ v₀) && !any(v₀) && !all(v₀)
     @test any(v) ? (v₀ < v) : (v === v₀)
-    @test (@inferred sum(v)) === count_ones(x) && (@inferred sum(.~v)) === count_zeros(x)
+    @test (@inferred sum(v)) === count_ones(x) && (@inferred sum(!, v)) === count_zeros(x)
 
-    # Logic
+    # Broadcasting logic
     y = rand(T)
     w = MBitVector(y)
-    @test convert(T, ~v) === ~x
-    @test convert(T, v & w) === x & y
-    @test convert(T, v | w) === x | y
-    @test convert(T, v ⊻ w) === x ⊻ y
-    i = rand(axes(x, 1))
-    @test convert(T, circshift(v, i)) === bitrotate(x, i)
+    @test convert(T, .~v) === ~x
+    @test convert(T, v .& w) === x & y
+    @test convert(T, v .| w) === x | y
+    @test convert(T, v .⊻ w) === x ⊻ y
+
+    # Bitrotate not defined for BitIntegers
+    if T in base_types 
+        i = rand(axes(x, 1))
+        @test convert(T, circshift(v, i)) === bitrotate(x, i)
+    end
 
     # Assignment
     for _ in 1:20
@@ -51,7 +59,7 @@ testtypes = (UInt8, UInt16, UInt32, UInt64, UInt128)
     end
 end
 
-@testset "Primitives for type $T" for T in testtypes
+@testset "Primitives for type $T" for T in (base_types..., custom_types...)
     # Simple deltaswaps
     a, b, c, d, e = T(1), T(2), T(3), T(5), T(12)
     @test [bitstr(x)[1:4] for x ∈ (a, b, c, d, e)] == ["1000","0100","1100","1010","0011"]
@@ -90,7 +98,7 @@ end
     end
 end
 
-@testset "BenesNetwork{$T}" for T in testtypes
+@testset "BenesNetwork{$T}" for T in base_types
     for _ in 1:10
         n = rand(1:bitsize(T))
         p = randperm(n)
@@ -105,7 +113,7 @@ end
     end
 end
 
-@testset "GRPNetwork{$T}" for T in testtypes
+@testset "GRPNetwork{$T}" for T in base_types
     for _ in 1:10
         n = rand(1:bitsize(T))
         p = randperm(n)
@@ -120,7 +128,7 @@ end
     end
 end
 
-@testset "BitPermutation{$T}" for T in testtypes
+@testset "BitPermutation{$T}" for T in base_types
     for _ in 1:10
         n = rand(1:bitsize(T))
         p = randperm(n)
@@ -147,7 +155,7 @@ end
     end
 end
 
-@testset "CompiledBitPermutation{$T}" for T in testtypes
+@testset "CompiledBitPermutation{$T}" for T in base_types
     P₁ = @eval @bitpermutation $T (2, 6, 5, 8, 4, 7, 1, 3)
     P₂ = BitPermutation{T}([2, 6, 5, 8, 4, 7, 1, 3])
     for _ in 1:100
@@ -156,3 +164,17 @@ end
         @test P₁'(x) === P₂'(x) === invbitpermute(x, P₁) === invbitpermute(x, P₂)
     end
 end
+
+@testset "BitIntegers{$T}" for T in custom_types
+    p = randperm(bitsize(T))
+    # Rearranging takes too long 
+    P = BitPermutation{T}(p; type=BenesNetwork, rearrange=false)
+
+    for _ in 1:100
+        x = rand(T)
+        v = bitstr(x)
+        @test bitstr(@inferred P(x)) == v[p]
+        @test bitstr(@inferred P'(x)) == v[invperm(p)]
+    end
+end
+

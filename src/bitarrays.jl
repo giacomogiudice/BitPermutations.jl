@@ -2,35 +2,47 @@
     MBitVector{T} <: AbstractArray{Bool,1}
 
 A mutable, statically-sized bit vector encoded in the bits in an element of type
-`T<:Base.BitInteger`.
+`T <: Unsigned`.
 
 An `MBitVector` should behave similarly to a `BitVector`, but it is slightly faster as 
 the size is known at compile-time to be `bitsize(T)`.
 """
-mutable struct MBitVector{T<:Base.BitInteger} <: AbstractArray{Bool,1}
+mutable struct MBitVector{T} <: AbstractArray{Bool,1}
     chunk::T
 
     # Constructor for Integers
-    MBitVector{T}(input::T) where T<:Base.BitInteger = new{T}(input)
+    MBitVector{T}(input::T) where T<:Unsigned = new{T}(input)
     
     # Constructor for iterable inputs
-    function MBitVector{T}(input) where {T<:Base.BitInteger}
+    function MBitVector{T}(input) where T<:Unsigned
         # Iterate over input
-        a = zero(T)
+        val = zero(T)
+        mask = one(T)
         n = 0
-        # Use bitrotate to cycle through input elements
+        # Set nth bit using mask 
         for x in input
-            convert(Bool, x) && (a |= one(T))
-            a = bitrotate(a, -1)
+            convert(Bool, x) && (val |= mask)
+            mask <<= 1
             n += 1
         end
-        n ≤ bitsize(T) || throw(OverflowError("Input type $A does not fit in MBitVector{$T}"))
-        a = bitrotate(a, n)
-        return new{T}(a)
+        n ≤ bitsize(T) || throw(OverflowError("Input $input does not fit in MBitVector{$T}"))
+        return new{T}(val)
     end
 end
 
-MBitVector(input::T) where T<:Base.BitInteger = MBitVector{T}(input)
+"""
+    MBitVector(input::T)
+    MBitVector{T}(input::T)
+
+Construct an `MBitVector` from the bits in `input`.
+"""
+MBitVector(input::T) where T = MBitVector{T}(input)
+
+"""
+    MBitVector{T}(input)
+
+Construct an `MBitVector` encoding the bits of some array, generator, or iterable in the bits of type `T`.
+""" 
 MBitVector(input::MBitVector{T}) where T = MBitVector{T}(chunk(input))
 
 # Getter
@@ -64,6 +76,7 @@ Base.isless(m₁::MBitVector{T}, m₂::MBitVector{T}) where T = chunk(m₁) < ch
 # Initializers
 Base.zero(m::MBitVector{T}) where T = MBitVector{T}(zero(T))
 Base.similar(m::MBitVector{T}) where T = zero(m)
+Base.similar(m::MBitVector, ::Type{Bool}) = similar(m)
 
 # Fast Base array operations
 Base.any(m::MBitVector) = !iszero(chunk(m))
@@ -88,14 +101,17 @@ end
 
 _peel(a::Integer) = (Bool(a & one(a)), a >> 1)
 
-# Logical operations
-Base.:~(m::MBitVector{T}) where T = MBitVector{T}(~chunk(m))
+# Specialize broadcasting of logical operations,
+# arbitrary ones are harder because of variable length issue
+Base.broadcasted(::Broadcast.DefaultArrayStyle{1}, ::typeof(~), m::MBitVector) = MBitVector(~chunk(m))
 
-Base.:&(m₁::MBitVector{T}, m₂::MBitVector{T}) where T = MBitVector{T}(chunk(m₁) & chunk(m₂))
+Base.broadcasted(bs::Broadcast.DefaultArrayStyle{1}, ::typeof(!), m::MBitVector) = broadcasted(bs, ~, m)
 
-Base.:|(m₁::MBitVector{T}, m₂::MBitVector{T}) where T = MBitVector{T}(chunk(m₁) | chunk(m₂))
+for op in (:&, :|, :xor)
+    @eval function Base.broadcasted(::Broadcast.DefaultArrayStyle{1}, ::typeof($op), m₁::MBitVector{T}, m₂::MBitVector{T}) where T 
+        return MBitVector($op(chunk(m₁), chunk(m₂)))
+    end
+end
 
-Base.xor(m₁::MBitVector{T}, m₂::MBitVector{T}) where T = MBitVector{T}(xor(chunk(m₁), chunk(m₂)))
-
-Base.circshift(m::MBitVector{T}, n::Int) where T = MBitVector{T}(bitrotate(chunk(m), n))
-
+# Fast circshift 
+Base.circshift(m::MBitVector, n::Int) = MBitVector(bitrotate(chunk(m), n))

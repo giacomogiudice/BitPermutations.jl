@@ -37,9 +37,11 @@ bitpermute(x, p)  # 0 0 0 0 1 0 0 0, or 0x10
 p(x)              # idem
 ```
 
-To inspect the result, we can use `bitstring`, or we can use a `MBitVector` (exported by the package).
+To inspect the result, we can use `bitstring`, or we can use a `MBitVector` (defined by the package).
 It is basically a faster `BitVector`, since its size if fixed (but is mutable).
 ```julia
+using BitPermutations: MBitVector
+
 mb = MBitVector(x)
 
 [mb[v], MBitVector(bitpermute(x, p))]
@@ -69,6 +71,7 @@ As discussed later on, choosing types `UInt32` or `UInt64` can lead to significa
 Here are some benchmarks on an Intel Haswell processor.
 ```julia
 using BitPermutations, Random, BenchmarkTools
+using BitPermutations: MBitVector
 
 T = UInt64
 p = shuffle!(collect(1:bitsize(T)))
