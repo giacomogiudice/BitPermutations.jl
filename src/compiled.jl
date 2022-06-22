@@ -1,4 +1,24 @@
 """
+    CompiledBitPermutation{T,F,F̄}
+
+Represents a bit permutation of type `T`, where the regular and inverse permutations are functions of type `F` and `F̄` respectively.
+"""
+struct CompiledBitPermutation{T,F<:Function,F̄<:Function} <: AbstractBitPermutation{T}
+    vector::Vector{Int}
+    regular::F
+    inverse::F̄
+
+    function CompiledBitPermutation{T}(vector, regular::Function, inverse::Function) where T
+        return new{T,typeof(regular),typeof(inverse)}(vector, regular, inverse)
+    end
+end
+
+@inline bitpermute(x::T, P::CompiledBitPermutation{T}) where T = P.regular(x)
+@inline invbitpermute(x::T, P::CompiledBitPermutation{T}) where T = P.inverse(x)
+
+@inline Vector(P::CompiledBitPermutation) = P.vector
+
+"""
     @bitpermutation T list
     @bitpermutation(T, list)
 
@@ -20,11 +40,11 @@ macro bitpermutation(typesymb, permexpr)
     perm = BitPermutation{T}(p)
 
     # Concatenate layer operations with `|>`
-    regular, inverse = _ops(perm.alg)
+    regular, inverse = _ops(perm.network)
 
     # Return something like:
     # "x -> x |> (x′ -> deltaswap(x′,...)) |> (x′ -> deltaswap(x′,...)) |> ..."
-    return esc(:(CompiledBitPermutation{$T}($regular, $inverse)))
+    return esc(:(CompiledBitPermutation{$T}($p, $regular, $inverse)))
 end
 
 function _ops(net::BenesNetwork)

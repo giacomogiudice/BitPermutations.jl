@@ -1,16 +1,16 @@
 """
-    BitPermutationAlgorithm{T}
+    PermutationNetwork{T}
 
 Abstract type for all bit permutation algorithms.
 """
-abstract type BitPermutationAlgorithm{T} end
+abstract type PermutationNetwork{T} end
 
 """
     BenesNetwork{T}
 
 Represents a Beneš network, which is a series of `deltaswap` operations with specified shifts and masks.
 """
-struct BenesNetwork{T} <: BitPermutationAlgorithm{T}
+struct BenesNetwork{T} <: PermutationNetwork{T}
     params::Vector{Tuple{T,Int}}
 end
 
@@ -188,7 +188,7 @@ end
 
 Represents a GRP network, which is a series of `grpswap` operations with specified shifts and masks.
 """
-struct GRPNetwork{T} <: BitPermutationAlgorithm{T}
+struct GRPNetwork{T} <: PermutationNetwork{T}
     params::Vector{Tuple{T,Int,T}}
 end
 

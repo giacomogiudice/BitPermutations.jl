@@ -1,5 +1,6 @@
 using BitPermutations
 using BitPermutations: MBitVector
+using BitPermutations: deltaswap, grpswap, invgrpswap
 using BitIntegers
 using Random
 using Test
@@ -129,22 +130,35 @@ end
 end
 
 @testset "BitPermutation{$T}" for T in base_types
+    p = [2, 6, 5, 8, 4, 7, 1, 3]
+    P₁ = BitPermutation{T}(p; type=BenesNetwork, rearrange=(T ∈ base_types))
+    P₂ = BitPermutation{T}(p; type=GRPNetwork)
+
+    # Make sure printing returns something
+    buf = IOBuffer()
+    show(buf, P₁)
+    @test !isempty(String(take!(buf)))
+    show(buf, P₂)
+    @test !isempty(String(take!(buf)))
+    show(buf, "text/plain", P₁)
+    @test !isempty(String(take!(buf)))
+    show(buf, "text/plain", P₂)
+    @test !isempty(String(take!(buf)))
+
+    # Test permutation properties
+    @test (@inferred order(P₁)) === (@inferred order(P₂))
+    @test collect(cycles(P₁)) == collect(cycles(P₂))
+    @test isodd(P₁) === isodd(P₂) === false
+    @test iseven(P₁) === iseven(P₂) === true
+    @test isodd(P₁') === isodd(P₂') === false
+    @test iseven(P₁') === iseven(P₂') === true
+
+    # Test random permutations
     for _ in 1:10
         n = rand(1:bitsize(T))
         p = randperm(n)
         P₁ = BitPermutation{T}(p; type=BenesNetwork)
         P₂ = BitPermutation{T}(p; type=GRPNetwork)
-
-        # Make sure printing returns something
-        buf = IOBuffer()
-        show(buf, P₁)
-        @test !isempty(String(take!(buf)))
-        show(buf, P₂)
-        @test !isempty(String(take!(buf)))
-        show(buf, "text/plain", P₁)
-        @test !isempty(String(take!(buf)))
-        show(buf, "text/plain", P₂)
-        @test !isempty(String(take!(buf)))
 
         for _ in 1:20
             x = rand(T)
@@ -155,17 +169,7 @@ end
     end
 end
 
-@testset "CompiledBitPermutation{$T}" for T in base_types
-    P₁ = @eval @bitpermutation $T (2, 6, 5, 8, 4, 7, 1, 3)
-    P₂ = BitPermutation{T}([2, 6, 5, 8, 4, 7, 1, 3])
-    for _ in 1:100
-        x = rand(T)
-        @test P₁(x) === P₂(x) === bitpermute(x, P₁) === bitpermute(x, P₂)
-        @test P₁'(x) === P₂'(x) === invbitpermute(x, P₁) === invbitpermute(x, P₂)
-    end
-end
-
-@testset "BitIntegers{$T}" for T in custom_types
+@testset "BitPermutation{$T}" for T in custom_types
     p = randperm(bitsize(T))
     # Rearranging takes too long 
     P = BitPermutation{T}(p; type=BenesNetwork, rearrange=false)
@@ -177,4 +181,18 @@ end
         @test bitstr(@inferred P'(x)) == v[invperm(p)]
     end
 end
+
+@testset "CompiledBitPermutation{$T}" for T in base_types
+    P₁ = @eval @bitpermutation $T (2, 6, 5, 8, 4, 7, 1, 3)
+    P₂ = BitPermutation{T}([2, 6, 5, 8, 4, 7, 1, 3])
+    @test isodd(P₁) === isodd(P₂) === false
+    @test iseven(P₁) === iseven(P₂) === true
+
+    for _ in 1:20
+        x = rand(T)
+        @test P₁(x) === P₂(x) === bitpermute(x, P₁) === bitpermute(x, P₂)
+        @test P₁'(x) === P₂'(x) === invbitpermute(x, P₁) === invbitpermute(x, P₂)
+    end
+end
+
 

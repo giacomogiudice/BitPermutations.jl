@@ -10,13 +10,14 @@ abstract type AbstractBitPermutation{T} end
 """
     BitPermutation{T,A}
 
-Represents a bit permutation of type `T`, performed with a `BitPermutationAlgorithm` of type `A`.
+Represents a bit permutation of type `T`, performed with a `PermutationNetwork` of type `A`.
 """
-struct BitPermutation{T,A<:BitPermutationAlgorithm{T}} <: AbstractBitPermutation{T}
-    alg::A
+struct BitPermutation{T,P<:PermutationNetwork{T}} <: AbstractBitPermutation{T}
+    vector::Vector{Int}
+    network::P
 
-    function BitPermutation{T}(alg::A) where {T,A<:BitPermutationAlgorithm{T}}
-        new{T,A}(alg)
+    function BitPermutation{T}(perm::Vector{Int}, net::P) where {T,P<:PermutationNetwork{T}}
+        new{T,P}(perm, net)
     end
 end
 
@@ -31,8 +32,9 @@ BMI2 instructions are supported by the processor, in which case a `GRPNetwork` i
 See also: [`BenesNetwork`](@ref), [`GRPNetwork`](@ref).
 """
 function BitPermutation{T}(p::AbstractVector{Int}; type::Type=_default_type(T), kwargs...) where T
-    alg = (type){T}(p; kwargs...)
-    return BitPermutation{T}(alg) 
+    perm = collect(p)
+    net = (type){T}(perm; kwargs...)
+    return BitPermutation{T}(perm, net) 
 end
 
 _default_type(::Type{T}) where T<:Union{UInt32,UInt64} = ifelse(USE_BMI2, GRPNetwork, BenesNetwork)
@@ -40,33 +42,40 @@ _default_type(_::Type{T}) where T = BenesNetwork
 
 Base.show(io::IO, ::BitPermutation{T}) where T = print(io, "BitPermutation{$T}")
 
-function Base.show(io::IO, ::MIME"text/plain", perm::BitPermutation{T}) where T
-    println(io, "BitPermutation{$T} with algorithm:")
-    print(io, " ", perm.alg)
+function Base.show(io::IO, ::MIME"text/plain", P::BitPermutation{T}) where T
+    println(io, "BitPermutation{$T} with network $(P.network):")
+    foreach(cycles(P)) do cycle
+        length(cycle) === 1 && return
+        print(io, "(")
+        join(io, cycle, " ")
+        print(io, ")")
+    end
     return nothing
 end
 
 """
     bitpermute(x::T, p::AbstractBitPermutation{T})
-    bitpermute(x::T, n::BitPermutationAlgorithm{T})
+    bitpermute(x::T, n::PermutationNetwork{T})
 
-Permute bits in `x` using a an `AbstractBitPermutation` or a `BitPermutationAlgorithm`.
+Permute bits in `x` using a an `AbstractBitPermutation` or a `PermutationNetwork`.
 Callable as well as `p(x)`.
 
 See also [`invbitpermute`](@ref).
 """
-@inline bitpermute(x::T, P::BitPermutation{T}) where T = bitpermute(x, P.alg)
+@inline bitpermute(x::T, P::BitPermutation{T}) where T = bitpermute(x, P.network)
 
 """
     invbitpermute(x::T, p::AbstractBitPermutation{T})
-    invbitpermute(x::T, n::BitPermutationAlgorithm{T})
+    invbitpermute(x::T, n::PermutationNetwork{T})
 
-Permute bits in `x` using a an `AbstractBitPermutation` or a `BitPermutationAlgorithm`.
+Permute bits in `x` using a an `AbstractBitPermutation` or a `PermutationNetwork`.
 Callable as well as `p'(x)`.
 
 See also [`bitpermute`](@ref).
 """
-@inline invbitpermute(x::T, P::BitPermutation{T}) where T = invbitpermute(x, P.alg)
+@inline invbitpermute(x::T, P::BitPermutation{T}) where T = invbitpermute(x, P.network)
+
+Base.Vector(P::BitPermutation) = P.vector
 
 """
     AdjointBitPermutation{T,P}
@@ -82,20 +91,75 @@ Base.adjoint(perm::AbstractBitPermutation) = AdjointBitPermutation(perm)
 @inline bitpermute(x::T, P::AdjointBitPermutation{T}) where T = invbitpermute(x, P.parent)
 @inline invbitpermute(x::T, P::AdjointBitPermutation{T}) where T = bitpermute(x, P.parent)
 
-"""
-    CompiledBitPermutation{T,F,F̄}
+Base.Vector(P::AdjointBitPermutation) = invperm(Vector(P.parent))
 
-Represents a bit permutation of type `T`, where the regular and inverse permutations are functions of type `F` and `F̄` respectively.
 """
-struct CompiledBitPermutation{T,F<:Function,F̄<:Function} <: AbstractBitPermutation{T}
-    regular::F
-    inverse::F̄
+    Cycles
 
-    function CompiledBitPermutation{T}(regular::Function, inverse::Function) where T
-        return new{T,typeof(regular),typeof(inverse)}(regular, inverse)
-    end
+Iterator over the cycles of a permutation vector.
+"""
+struct Cycles
+    vector::Vector{Int}
 end
 
-@inline bitpermute(x::T, P::CompiledBitPermutation{T}) where T = P.regular(x)
-@inline invbitpermute(x::T, P::CompiledBitPermutation{T}) where T = P.inverse(x)
+Base.IteratorEltype(::Type{<:Cycles}) = Base.HasEltype()
+Base.IteratorSize(::Type{<:Cycles}) = Base.SizeUnknown()
 
+Base.eltype(::Cycles) = Vector{Int}
+
+Base.iterate(iter::Cycles) = _nextcycle!(trues(length(iter.vector)), iter.vector)
+Base.iterate(iter::Cycles, state::BitVector) = _nextcycle!(state, iter.vector)
+
+function _nextcycle!(state::BitVector, p::AbstractVector{Int})
+    # Find first not visited index
+    i = findfirst(state)
+    isnothing(i) && return nothing
+
+    state[i] = false
+    cycle = [i]
+    # Iterate until you get back to i
+    j = p[i]
+    while j ≠ i
+        push!(cycle, j)
+        state[j] = false
+        j = p[j]
+    end
+    return cycle, state
+end
+
+"""
+    cycles(P::AbstractBitPermutation)
+
+Returns an iterator over the cycles of the permutation `P`.
+"""
+cycles(P::AbstractBitPermutation) = Cycles(Vector(P))
+
+"""
+    order(P::AbstractBitPermutation)
+
+Return the order of the permutation `P`, i.e. the amount of times you have to apply the permutation to obtain the trivial permutation.
+
+See also [`isodd`](@ref), [`iseven`](@ref) to compute the parity.
+"""    
+order(P::AbstractBitPermutation) = mapreduce(length, lcm, cycles(P); init=1)
+
+"""
+    isodd(P::AbstractBitPermutation)
+
+Returns a `Bool` corresponding to whether or not the parity of the permutation is odd.
+
+See also [`iseven`](@ref).
+"""
+Base.isodd(P::BitPermutation{T,BenesNetwork{T}}) where T = isodd(count_ones(mapreduce(first, ⊻, P.network.params; init=zero(T))))
+Base.isodd(P::BitPermutation{T,GRPNetwork{T}}) where T = isodd(count_ones(mapreduce(first, ⊻, P.network.params; init=zero(T))))
+Base.isodd(P::AdjointBitPermutation) = isodd(P.parent)
+Base.isodd(P::AbstractBitPermutation) = mapreduce(isodd ∘ length, ⊻, cycles(P); init=false)
+
+"""
+    iseven(P::AbstractBitPermutation)
+
+Returns a `Bool` corresponding to whether or not the parity of the permutation is even.
+
+See also [`isodd`](@ref).
+"""
+Base.iseven(P::AbstractBitPermutation) = !isodd(P)
