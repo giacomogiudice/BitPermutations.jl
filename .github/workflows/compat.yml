@@ -9,3 +9,5 @@ jobs:
     steps:
       - name: Check for updates
         uses: JuliaRegistries/compathelper-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
