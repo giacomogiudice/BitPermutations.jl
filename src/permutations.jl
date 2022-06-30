@@ -144,6 +144,16 @@ See also [`isodd`](@ref), [`iseven`](@ref) to compute the parity.
 order(P::AbstractBitPermutation) = mapreduce(length, lcm, cycles(P); init=1)
 
 """
+    sign(P::AbstractBitPermutation)
+
+Returns the sign of the permutation `P`, +1 (-1) if it is of even (odd) parity.
+
+See also [`isodd`](@ref), [`iseven`](@ref).
+
+"""
+Base.sign(P::AbstractBitPermutation) = ifelse(isodd(P), -1, +1)
+
+"""
     isodd(P::AbstractBitPermutation)
 
 Returns a `Bool` corresponding to whether or not the parity of the permutation is odd.
