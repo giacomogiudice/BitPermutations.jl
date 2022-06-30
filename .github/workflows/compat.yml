@@ -1,0 +1,11 @@
+name: CompatHelper
+on:
+  schedule:
+    - cron: 0 0 1 * * # First day of the month
+  workflow_dispatch:
+jobs:
+  CompatHelper:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for updates
+        uses: JuliaRegistries/compathelper-action@v1
