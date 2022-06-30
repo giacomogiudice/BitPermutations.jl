@@ -7,7 +7,12 @@ jobs:
   CompatHelper:
     runs-on: ubuntu-latest
     steps:
-      - name: Check for updates
-        uses: JuliaRegistries/compathelper-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run CompatHelper
+        run: |
+          import Pkg
+          Pkg.add("CompatHelper")
+          import CompatHelper
+          CompatHelper.main()
+        shell: julia --color=yes {0}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
