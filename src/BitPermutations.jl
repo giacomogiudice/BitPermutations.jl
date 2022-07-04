@@ -10,14 +10,10 @@ export bitsize
 export bitpermute, invbitpermute
 export cycles, order
 
-export CompiledBitPermutation
-export @bitpermutation
-
 include("intrinsics.jl")
 include("primitives.jl")
 include("bitarrays.jl")
 include("networks.jl")
 include("permutations.jl")
-include("compiled.jl")
 
 end # module

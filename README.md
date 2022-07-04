@@ -16,7 +16,7 @@ To have each reshuffling layer efficient, they have to be chosen from sets of op
 Precomputing these operations is slighly non-trivial, so this package may be useful only if you need to compute the application of a given permutation to a large number of words.
 
 ## Usage
-To define a permutation of the bits in type `T`, you can either use a `BitPermutation{T}` (if the permutation is known at runtime) or construct a `CompiledBitPermutation{T}` with the `@bitpermutation` macro (if the permutation is known at compile time).
+To define a permutation of the bits in type `T`, construct a `BitPermutation{T}`.
 
 Here is an example with `T = UInt8`.
 Bits are ordered from LSB to MSB.
@@ -105,8 +105,6 @@ julia> @btime permute!($bv, $p);
   303.579 ns (1 allocation: 576 bytes) 
 ```
 If your permutation is not random, it is likely to have even larger speedups as the networks will have fewer layers.
-
-As noted above, if you know your permutation beforehand, using the `@bitpermutation` macro will allow the compiler to do further optimizations and might achieve even higher speedups.
 
 ## Details
 For a more in-depth explanation, the wonderful [https://programming.sirrida.de/bit_perm.html](https://programming.sirrida.de/bit_perm.html) is well worth reading.

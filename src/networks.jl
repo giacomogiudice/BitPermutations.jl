@@ -171,15 +171,26 @@ end
 
 Base.show(io::IO, net::BenesNetwork) = print(io, "$(typeof(net)) with $(length(net.params)) operations")
 
-function bitpermute(x::T, net::BenesNetwork{T}) where T
-    return foldl(net.params; init=x) do x′, (mask, shift)
+function bitpermute(x::Number, net::BenesNetwork{T}) where T
+    return foldl(net.params; init=convert(T, x)) do x′, (mask, shift)
         return deltaswap(x′, mask, shift)
     end
 end
 
-function invbitpermute(x::T, net::BenesNetwork{T}) where T
-    return foldl(Iterators.reverse(net.params); init=x) do x′, (mask, shift)
+function Base.broadcasted(::typeof(bitpermute), x::AbstractArray, net::BenesNetwork)
+    return foldl(net.params; init=x) do x′, (mask, shift)
+        return deltaswap.(x′, mask, shift)
+    end
+end
+
+function invbitpermute(x::Number, net::BenesNetwork{T}) where T
+    return foldl(Iterators.reverse(net.params); init=convert(T, x)) do x′, (mask, shift)
         return deltaswap(x′, mask, shift)
+    end
+end
+
+function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, net::BenesNetwork)    return foldl(Iterators.reverse(net.params); init=x) do x′, (mask, shift)
+        return deltaswap.(x′, mask, shift)
     end
 end
 
@@ -244,14 +255,25 @@ end
 
 Base.show(io::IO, net::GRPNetwork) = print(io, "$(typeof(net)) with $(length(net.params)) operations")
 
-function bitpermute(x::T, net::GRPNetwork{T}) where T
-    return foldl(net.params; init=x) do x′, args
+function bitpermute(x::Number, net::GRPNetwork{T}) where T
+    return foldl(net.params; init=convert(T, x)) do x′, args
         return grpswap(x′, args...)
     end
 end
 
-function invbitpermute(x::T, net::GRPNetwork{T}) where T
-    return foldl(Iterators.reverse(net.params); init=x) do x′, args
+function Base.broadcasted(::typeof(bitpermute), x::AbstractArray, net::GRPNetwork)    
+    return foldl(net.params; init=x) do x′, args...
+        return grpswap.(x′, args...)
+    end
+end
+
+function invbitpermute(x::Number, net::GRPNetwork{T}) where T
+    return foldl(Iterators.reverse(net.params); init=convert(T, x)) do x′, args
         return invgrpswap(x′, args...)
+    end
+end
+
+function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, net::GRPNetwork)    return foldl(Iterators.reverse(net.params); init=x) do x′, args
+        return invgrpswap.(x′, args...)
     end
 end

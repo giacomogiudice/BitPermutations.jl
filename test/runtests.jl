@@ -152,6 +152,8 @@ end
     @test iseven(P₁) === iseven(P₂) === true
     @test isodd(P₁') === isodd(P₂') === false
     @test iseven(P₁') === iseven(P₂') === true
+    @test sign(P₁) === sign(P₁') === 1
+    @test sign(P₂) === sign(P₂') === 1
 
     # Test random permutations
     for _ in 1:10
@@ -167,6 +169,17 @@ end
             @test P₁(x) === invbitpermute(x, P₁') === P₂(x) === invbitpermute(x, P₂')
         end
     end
+
+    # Test permutations of arrays
+    for _ in 1:10
+        p = randperm(bitsize(T))
+        P = BitPermutation{T}(p)
+        arr = rand(T, 1000)
+        res = [bitpermute(x, P) for x in arr]
+        @test P.(arr) == bitpermute.(arr, P) == res
+        res = [invbitpermute(x, P) for x in arr]
+        @test P'.(arr) == invbitpermute.(arr, P) == res
+    end 
 end
 
 @testset "BitPermutation{$T}" for T in custom_types
