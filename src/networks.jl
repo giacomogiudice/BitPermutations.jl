@@ -262,7 +262,7 @@ function bitpermute(x::Number, net::GRPNetwork{T}) where T
 end
 
 function Base.broadcasted(::typeof(bitpermute), x::AbstractArray, net::GRPNetwork)    
-    return foldl(net.params; init=x) do x′, args...
+    return foldl(net.params; init=x) do x′, args
         return grpswap.(x′, args...)
     end
 end

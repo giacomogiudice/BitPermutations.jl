@@ -175,10 +175,8 @@ end
         p = randperm(bitsize(T))
         P = BitPermutation{T}(p)
         arr = rand(T, 1000)
-        res = [bitpermute(x, P) for x in arr]
-        @test P.(arr) == bitpermute.(arr, P) == res
-        res = [invbitpermute(x, P) for x in arr]
-        @test P'.(arr) == invbitpermute.(arr, P) == res
+        @test P.(arr) == bitpermute.(arr, P) == [bitpermute(x, P) for x in arr]
+        @test P'.(arr) == invbitpermute.(arr, P) == [invbitpermute(x, P) for x in arr]
     end 
 end
 
@@ -194,18 +192,3 @@ end
         @test bitstr(@inferred P'(x)) == v[invperm(p)]
     end
 end
-
-@testset "CompiledBitPermutation{$T}" for T in base_types
-    P₁ = @eval @bitpermutation $T (2, 6, 5, 8, 4, 7, 1, 3)
-    P₂ = BitPermutation{T}([2, 6, 5, 8, 4, 7, 1, 3])
-    @test isodd(P₁) === isodd(P₂) === false
-    @test iseven(P₁) === iseven(P₂) === true
-
-    for _ in 1:20
-        x = rand(T)
-        @test P₁(x) === P₂(x) === bitpermute(x, P₁) === bitpermute(x, P₂)
-        @test P₁'(x) === P₂'(x) === invbitpermute(x, P₁) === invbitpermute(x, P₂)
-    end
-end
-
-
