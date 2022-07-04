@@ -56,14 +56,13 @@ invbitpermute(x, p) === p'(x)
 ```
 
 Internally, a `Vector` of bit masks and shifts are stored and then applied sequentially at each call to `bitpermute`.
-If you know the permutation beforehand, you can use the `@bitpermutation` macro.
-It will minimize the overhead of doing the reduction and compile down to a set of bit moving instructions.
+If you need to apply the permutation to an array of data, use broacasting as it is optimized to be faster than performing the permutations individually
 ```julia
-p = @bitpermutation UInt32 (2, 6, 5, 8, 4, 7, 1, 3)
+xs = rand(T, 10)
 
-x = rand(UInt32)
+p.(xs)    # Regular permutation element-wise
 
-p(x), p'(x)
+p'.(xs)   # Inverse permutation element-wise
 ```
 
 ## Benchmarks
@@ -105,6 +104,20 @@ julia> @btime permute!($bv, $p);
   303.579 ns (1 allocation: 576 bytes) 
 ```
 If your permutation is not random, it is likely to have even larger speedups as the networks will have fewer layers.
+
+Broadcasted permutations are even faster than performing the permutations individually
+```julia
+xs = rand(T, 10_000)
+```
+This gives a further 2x speedup:
+```
+julia> @btime bitpermute.($xs, $benes);
+  86.915 μs (22 allocations: 859.89 KiB)
+
+julia> @btime bitpermute.($xs, $grp);
+  46.020 μs (10 allocations: 390.86 KiB)
+```
+Your mileage may very, as it is dependent on whether or not the array fits in cache.
 
 ## Details
 For a more in-depth explanation, the wonderful [https://programming.sirrida.de/bit_perm.html](https://programming.sirrida.de/bit_perm.html) is well worth reading.
