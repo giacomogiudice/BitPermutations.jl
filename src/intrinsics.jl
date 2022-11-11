@@ -7,8 +7,15 @@ function has_bmi2()
     CPUInfo = zeros(Int32, 4)
     # Explanation:
     # https://stackoverflow.com/questions/32214843/compiler-macro-to-detect-bmi2-instruction-set
-    ccall(:jl_cpuidex, Cvoid, (Ptr{Cint}, Cint, Cint), CPUInfo, 7, 0)
-    return !iszero(CPUInfo[2] & 0x100)
+    if Sys.ARCH === :x86_64
+        try
+            ccall(:jl_cpuidex, Cvoid, (Ptr{Cint}, Cint, Cint), CPUInfo, 7, 0)
+            return !iszero(CPUInfo[2] & 0x100)
+        catch err
+            @warn "Failed to query CPU information. $(err.msg)"
+        end
+    end
+    return false
 end
 
 """
