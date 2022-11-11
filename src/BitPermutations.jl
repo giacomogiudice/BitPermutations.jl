@@ -3,6 +3,7 @@ module BitPermutations
 using Combinatorics
 using Base: Broadcast
 
+export Bits
 export PermutationNetwork, BenesNetwork, GRPNetwork
 export AbstractBitPermutation, BitPermutation, AdjointBitPermutation
 
