@@ -5,7 +5,9 @@ Abstract bit permutation supertype.
 """
 abstract type AbstractBitPermutation{T} end
 
-(perm::AbstractBitPermutation{T})(x::T) where T = bitpermute(x, perm)
+(perm::AbstractBitPermutation)(x) = bitpermute(x, perm)
+
+Base.broadcasted(P::AbstractBitPermutation, x) = Base.broadcasted(bitpermute, x, P)
 
 """
     BitPermutation{T,A}
@@ -54,26 +56,28 @@ function Base.show(io::IO, ::MIME"text/plain", P::BitPermutation{T}) where T
 end
 
 """
-    bitpermute(x::T, p::AbstractBitPermutation{T})
-    bitpermute(x::T, n::PermutationNetwork{T})
+    bitpermute(x, p::AbstractBitPermutation)
+    bitpermute(x, n::PermutationNetwork)
 
 Permute bits in `x` using a an `AbstractBitPermutation` or a `PermutationNetwork`.
 Callable as well as `p(x)`.
 
 See also [`invbitpermute`](@ref).
 """
-@inline bitpermute(x::T, P::BitPermutation{T}) where T = bitpermute(x, P.network)
+@inline bitpermute(x, P::BitPermutation) = bitpermute(x, P.network)
 
 """
-    invbitpermute(x::T, p::AbstractBitPermutation{T})
-    invbitpermute(x::T, n::PermutationNetwork{T})
+    invbitpermute(x, p::AbstractBitPermutation)
+    invbitpermute(x, n::PermutationNetwork)
 
 Permute bits in `x` using a an `AbstractBitPermutation` or a `PermutationNetwork`.
 Callable as well as `p'(x)`.
 
 See also [`bitpermute`](@ref).
 """
-@inline invbitpermute(x::T, P::BitPermutation{T}) where T = invbitpermute(x, P.network)
+@inline invbitpermute(x, P::BitPermutation) = invbitpermute(x, P.network)
+
+@inline Base.broadcasted(f::Union{typeof(bitpermute),typeof(invbitpermute)}, x::AbstractArray, P::BitPermutation) = Base.broadcasted(f, x, P.network)
 
 Base.Vector(P::BitPermutation) = P.vector
 
@@ -88,8 +92,11 @@ end
 
 Base.adjoint(perm::AbstractBitPermutation) = AdjointBitPermutation(perm)
 
-@inline bitpermute(x::T, P::AdjointBitPermutation{T}) where T = invbitpermute(x, P.parent)
-@inline invbitpermute(x::T, P::AdjointBitPermutation{T}) where T = bitpermute(x, P.parent)
+@inline bitpermute(x, P::AdjointBitPermutation) = invbitpermute(x, P.parent)
+@inline invbitpermute(x, P::AdjointBitPermutation) = bitpermute(x, P.parent)
+
+Base.broadcasted(::typeof(bitpermute), x::AbstractArray, P::AdjointBitPermutation) = Base.broadcasted(invbitpermute, x, P.parent)
+Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, P::AdjointBitPermutation) = broadcasted(bitpermute, x, P.parent)
 
 Base.Vector(P::AdjointBitPermutation) = invperm(Vector(P.parent))
 

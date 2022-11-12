@@ -16,7 +16,7 @@ To have each reshuffling layer efficient, they have to be chosen from sets of op
 Precomputing these operations is slighly non-trivial, so this package may be useful only if you need to compute the application of a given permutation to a large number of words.
 
 ## Usage
-To define a permutation of the bits in type `T`, you can either use a `BitPermutation{T}` (if the permutation is known at runtime) or construct a `CompiledBitPermutation{T}` with the `@bitpermutation` macro (if the permutation is known at compile time).
+To define a permutation of the bits in type `T`, construct a `BitPermutation{T}`.
 
 Here is an example with `T = UInt8`.
 Bits are ordered from LSB to MSB.
@@ -37,14 +37,12 @@ bitpermute(x, p)  # 0 0 0 0 1 0 0 0, or 0x10
 p(x)              # idem
 ```
 
-To inspect the result, we can use `bitstring`, or we can use a `MBitVector` (defined by the package).
+To inspect the result, we can use `bitstring`, or we can use a `Bits` (defined by the package).
 It is basically a faster `BitVector`, since its size if fixed (but is mutable).
 ```julia
-using BitPermutations: MBitVector
+mb = Bits(x)
 
-mb = MBitVector(x)
-
-[mb[v], MBitVector(bitpermute(x, p))]
+[mb[v], Bits(bitpermute(x, p))]
 ```
 
 The neat thing of the underlying network is that the inverse permutation can be computed at the same cost.
@@ -52,18 +50,17 @@ This can be performed using `invbitpermute` or calling the adjoint permutation
 ```julia
 invbitpermute(x, p) === p'(x)
 
-[mb[invperm(v)], MBitVector(invbitpermute(x, p))]
+[mb[invperm(v)], Bits(invbitpermute(x, p))]
 ```
 
 Internally, a `Vector` of bit masks and shifts are stored and then applied sequentially at each call to `bitpermute`.
-If you know the permutation beforehand, you can use the `@bitpermutation` macro.
-It will minimize the overhead of doing the reduction and compile down to a set of bit moving instructions.
+If you need to apply the permutation to an array of data, use broacasting as it is optimized to be faster than performing the permutations individually
 ```julia
-p = @bitpermutation UInt32 (2, 6, 5, 8, 4, 7, 1, 3)
+xs = rand(T, 10)
 
-x = rand(UInt32)
+p.(xs)    # Regular permutation element-wise
 
-p(x), p'(x)
+p'.(xs)   # Inverse permutation element-wise
 ```
 
 ## Benchmarks
@@ -71,7 +68,6 @@ As discussed later on, choosing types `UInt32` or `UInt64` can lead to significa
 Here are some benchmarks on an Intel Haswell processor.
 ```julia
 using BitPermutations, Random, BenchmarkTools
-using BitPermutations: MBitVector
 
 T = UInt64
 p = shuffle!(collect(1:bitsize(T)))
@@ -91,9 +87,9 @@ julia> @btime bitpermute($x, $grp);
   10.872 ns (0 allocations: 0 bytes)
 ```
 If you don't have hardware acceleration, the `GRPNetwork` permutation will still work but will be very slow.
-Let's now compare to naively permuting `MBitVector`s and `BitVector`s from `Base`.
+Let's now compare to naively permuting `Bits`s and `BitVector`s from `Base`.
 ```julia 
-mv = MBitVector(x)
+mv = Bits(x)
 bv = BitVector(mv)
 ```
 They are around 5x (15x) and 10x (30x) slower compared to the `BenesNetwork` (`GRPNetwork`). 
@@ -106,7 +102,19 @@ julia> @btime permute!($bv, $p);
 ```
 If your permutation is not random, it is likely to have even larger speedups as the networks will have fewer layers.
 
-As noted above, if you know your permutation beforehand, using the `@bitpermutation` macro will allow the compiler to do further optimizations and might achieve even higher speedups.
+Broadcasted permutations are even faster than performing the permutations individually
+```julia
+xs = rand(T, 10_000)
+```
+This gives a further 2x speedup:
+```
+julia> @btime bitpermute.($xs, $benes);
+  86.915 μs (22 allocations: 859.89 KiB)
+
+julia> @btime bitpermute.($xs, $grp);
+  46.020 μs (10 allocations: 390.86 KiB)
+```
+Your mileage may very, as it is dependent on whether or not the array fits in cache.
 
 ## Details
 For a more in-depth explanation, the wonderful [https://programming.sirrida.de/bit_perm.html](https://programming.sirrida.de/bit_perm.html) is well worth reading.
@@ -156,6 +164,7 @@ The construction of the masks follows the algorithm in: R. Lee, Z. Shi, X. Yang,
 Several improvements could be made.
 Here I just list the first ones off the top of my head:
 
+- **Use ARM64-specific instructions** It would be nice to improve performance on ARM processors by exploiting intrinsics. There is no `PEXT/PDEP` equivalent, but there are some interesting possibilities described [here](https://developer.arm.com/documentation/102159/0400/Permutation---Neon-instructions)
 - **Preconditioning** A simple way of reducing the depth of the network is to try cheap operations like `bitreverse` and `bitshift` before or after the network to try to save masks. This is what is done [here](https://programming.sirrida.de/calcperm.php).
 - **Lookup tables** Small permutations could benefit from doing sub-permutations with a precomputed table. One could use `pext` to extract say 8 bits at a time, look up their permutation in a table of 256 elements, and join the results with `|`. This approach is fast but scales linearly with size, both in time and space, so it is interesting for permutations on `UInt8`s, `UInt16`s and possibly `UInt32`s.
 - **PSHUFB** The [PSHUFB](https://www.chessprogramming.org/SSSE3#PSHUFB) instruction is part of SSE3 and can perform arbitrary byte reshufflings. It could be used to compress a bunch of layers or combined with lookup tables for some very promising speedups.

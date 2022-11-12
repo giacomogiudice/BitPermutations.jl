@@ -1,5 +1,4 @@
 using BitPermutations
-using BitPermutations: MBitVector
 using BitPermutations: deltaswap, grpswap, invgrpswap
 using BitIntegers
 using Random
@@ -19,27 +18,27 @@ base_types = (UInt8, UInt16, UInt32, UInt64, UInt128)
 # Types defined in BitIntegers
 custom_types = (UInt256, UInt512, UInt1024)
 
-@testset "MBitVector{$T}" for T in (base_types..., custom_types...)
+@testset "Bits{$T}" for T in (base_types..., custom_types...)
     x = rand(T)
     @test (@inferred bitsize(x)) === 8*sizeof(x)
 
     # Construction
-    v = @inferred MBitVector(x)
-    @test @inferred MBitVector{T}(x for x in v) == v
+    v = @inferred Bits(x)
+    @test @inferred Bits{T}(x for x in v) == v
     @test @inferred all(((i, x),) -> v[i] === x, enumerate(v))
     bitstr(x) == string(v)
 
     # Comparison
-    w = MBitVector(v)
+    w = Bits(v)
     @test (@inferred w == v) && (@inferred isequal(w, v))
-    v₀ = MBitVector(zero(T))
+    v₀ = Bits(zero(T))
     @test (v ≥ v₀) && !any(v₀) && !all(v₀)
     @test any(v) ? (v₀ < v) : (v === v₀)
     @test (@inferred sum(v)) === count_ones(x) && (@inferred sum(!, v)) === count_zeros(x)
 
     # Broadcasting logic
     y = rand(T)
-    w = MBitVector(y)
+    w = Bits(y)
     @test convert(T, .~v) === ~x
     @test convert(T, v .& w) === x & y
     @test convert(T, v .| w) === x | y
@@ -73,8 +72,8 @@ end
         x = rand(T)
         s = rand(1:4)
         m = rand(T); m = (m & ~(m << s)) >> s
-        v = @inferred deltaswap(MBitVector(x), MBitVector(m), s)
-        v′ = @inferred MBitVector(deltaswap(x, m, s))
+        v = @inferred deltaswap(Bits(x), Bits(m), s)
+        v′ = @inferred Bits(deltaswap(x, m, s))
         @test v == v′
         @test (@inferred deltaswap(deltaswap(x, m, s), m, s)) === x
     end
@@ -90,12 +89,12 @@ end
     for _ in 1:20
         x = rand(T)
         m = rand(T)
-        v = @inferred grpswap(MBitVector(x), MBitVector(m))
-        v′ = @inferred MBitVector(grpswap(x, m))
+        v = @inferred grpswap(Bits(x), Bits(m))
+        v′ = @inferred Bits(grpswap(x, m))
         @test v == v′
         @test (@inferred invgrpswap(grpswap(x, m), m)) === x
-        v′ = @inferred invgrpswap(v, MBitVector(m))
-        @test v′ == MBitVector(x)
+        v′ = @inferred invgrpswap(v, Bits(m))
+        @test v′ == Bits(x)
     end
 end
 
@@ -152,6 +151,8 @@ end
     @test iseven(P₁) === iseven(P₂) === true
     @test isodd(P₁') === isodd(P₂') === false
     @test iseven(P₁') === iseven(P₂') === true
+    @test sign(P₁) === sign(P₁') === 1
+    @test sign(P₂) === sign(P₂') === 1
 
     # Test random permutations
     for _ in 1:10
@@ -167,6 +168,15 @@ end
             @test P₁(x) === invbitpermute(x, P₁') === P₂(x) === invbitpermute(x, P₂')
         end
     end
+
+    # Test permutations of arrays
+    for _ in 1:10
+        p = randperm(bitsize(T))
+        P = BitPermutation{T}(p)
+        arr = rand(T, 1000)
+        @test P.(arr) == bitpermute.(arr, P) == [bitpermute(x, P) for x in arr]
+        @test P'.(arr) == invbitpermute.(arr, P) == [invbitpermute(x, P) for x in arr]
+    end 
 end
 
 @testset "BitPermutation{$T}" for T in custom_types
@@ -181,18 +191,3 @@ end
         @test bitstr(@inferred P'(x)) == v[invperm(p)]
     end
 end
-
-@testset "CompiledBitPermutation{$T}" for T in base_types
-    P₁ = @eval @bitpermutation $T (2, 6, 5, 8, 4, 7, 1, 3)
-    P₂ = BitPermutation{T}([2, 6, 5, 8, 4, 7, 1, 3])
-    @test isodd(P₁) === isodd(P₂) === false
-    @test iseven(P₁) === iseven(P₂) === true
-
-    for _ in 1:20
-        x = rand(T)
-        @test P₁(x) === P₂(x) === bitpermute(x, P₁) === bitpermute(x, P₂)
-        @test P₁'(x) === P₂'(x) === invbitpermute(x, P₁) === invbitpermute(x, P₂)
-    end
-end
-
-

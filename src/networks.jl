@@ -26,7 +26,7 @@ function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearran
     shifts = reverse!([2^i for i in 0:trailing_zeros(bitsize(T)÷2)])
 
     # Initialize masks
-    masks = Vector{MBitVector{T}}(undef, 2*length(shifts) - 1)
+    masks = Vector{Bits{T}}(undef, 2*length(shifts) - 1)
 
     # Fill with garbage so they are all computed the first time
     prevshifts = zeros(Int, length(shifts))
@@ -75,7 +75,7 @@ function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearran
     return BenesNetwork([(chunk(m), δ) for (m, δ) in zip(masks, deltas) if any(m)])
 end
 
-function _setstagemasks!(masks::AbstractVector{MBitVector{T}}, shifts::AbstractVector{Int}, p::AbstractVector{Int}, index::Int) where T
+function _setstagemasks!(masks::AbstractVector{Bits{T}}, shifts::AbstractVector{Int}, p::AbstractVector{Int}, index::Int) where T
     # All nodes must be repartitioned in two sets with the same number of elements
     # encoded with {true|false}, corresponding to which partition they are destined to
     n = length(p)
@@ -84,12 +84,12 @@ function _setstagemasks!(masks::AbstractVector{MBitVector{T}}, shifts::AbstractV
     shift = shifts[index]
 
     # Keeps track of visited nodes
-    visited = MBitVector(zero(T))
+    visited = Bits(zero(T))
     # Partition of next stage
-    partition = MBitVector{T}(c for _ in 1:(n÷2shift) for c in 0:1 for _ in 1:shift)
+    partition = Bits{T}(c for _ in 1:(n÷2shift) for c in 0:1 for _ in 1:shift)
     # Instantiate masks
-    mask_forward = MBitVector(zero(T))
-    mask_backward = MBitVector(zero(T))
+    mask_forward = Bits(zero(T))
+    mask_backward = Bits(zero(T))
 
     # Heuristic: start from the smallest index which is not moved
     i = 1
@@ -154,10 +154,10 @@ function _setstagemasks!(masks::AbstractVector{MBitVector{T}}, shifts::AbstractV
 end
 
 # Moves bits in mask to MSB position 
-function _normalize_mask(mask::MBitVector{T}, partition::MBitVector{T}, shift::Int) where T
+function _normalize_mask(mask::Bits{T}, partition::Bits{T}, shift::Int) where T
     m = chunk(mask)
     p = chunk(partition)
-    return MBitVector{T}(((m >> shift) | m) & ~p)
+    return Bits{T}(((m >> shift) | m) & ~p)
 end
 
 # Finds index shifted up or down by `shift`
@@ -171,15 +171,26 @@ end
 
 Base.show(io::IO, net::BenesNetwork) = print(io, "$(typeof(net)) with $(length(net.params)) operations")
 
-function bitpermute(x::T, net::BenesNetwork{T}) where T
-    return foldl(net.params; init=x) do x′, (mask, shift)
+function bitpermute(x::Number, net::BenesNetwork{T}) where T
+    return foldl(net.params; init=convert(T, x)) do x′, (mask, shift)
         return deltaswap(x′, mask, shift)
     end
 end
 
-function invbitpermute(x::T, net::BenesNetwork{T}) where T
-    return foldl(Iterators.reverse(net.params); init=x) do x′, (mask, shift)
+function Base.broadcasted(::typeof(bitpermute), x::AbstractArray, net::BenesNetwork)
+    return foldl(net.params; init=x) do x′, (mask, shift)
+        return deltaswap.(x′, mask, shift)
+    end
+end
+
+function invbitpermute(x::Number, net::BenesNetwork{T}) where T
+    return foldl(Iterators.reverse(net.params); init=convert(T, x)) do x′, (mask, shift)
         return deltaswap(x′, mask, shift)
+    end
+end
+
+function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, net::BenesNetwork)    return foldl(Iterators.reverse(net.params); init=x) do x′, (mask, shift)
+        return deltaswap.(x′, mask, shift)
     end
 end
 
@@ -215,7 +226,7 @@ function GRPNetwork{T}(perm::AbstractVector{Int}) where T
     end
 
     # Merge lists pairwise until there is only one left
-    masks = MBitVector[]
+    masks = Bits[]
     while length(lists) > 1
         # Make sure `lists` has an even size
         isodd(length(lists)) && push!(lists, Int[])
@@ -235,7 +246,7 @@ function GRPNetwork{T}(perm::AbstractVector{Int}) where T
 
         # Push mask to front since order of masks should be reversed
         lists = mergedlists
-        pushfirst!(masks, MBitVector{T}(vcat(partialmasks...)))
+        pushfirst!(masks, Bits{T}(vcat(partialmasks...)))
     end
     @assert issorted(first(lists))
 
@@ -244,14 +255,25 @@ end
 
 Base.show(io::IO, net::GRPNetwork) = print(io, "$(typeof(net)) with $(length(net.params)) operations")
 
-function bitpermute(x::T, net::GRPNetwork{T}) where T
-    return foldl(net.params; init=x) do x′, args
+function bitpermute(x::Number, net::GRPNetwork{T}) where T
+    return foldl(net.params; init=convert(T, x)) do x′, args
         return grpswap(x′, args...)
     end
 end
 
-function invbitpermute(x::T, net::GRPNetwork{T}) where T
-    return foldl(Iterators.reverse(net.params); init=x) do x′, args
+function Base.broadcasted(::typeof(bitpermute), x::AbstractArray, net::GRPNetwork)    
+    return foldl(net.params; init=x) do x′, args
+        return grpswap.(x′, args...)
+    end
+end
+
+function invbitpermute(x::Number, net::GRPNetwork{T}) where T
+    return foldl(Iterators.reverse(net.params); init=convert(T, x)) do x′, args
         return invgrpswap(x′, args...)
+    end
+end
+
+function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, net::GRPNetwork)    return foldl(Iterators.reverse(net.params); init=x) do x′, args
+        return invgrpswap.(x′, args...)
     end
 end
