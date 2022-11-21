@@ -76,7 +76,6 @@ Base.isless(m₁::Bits{T}, m₂::Bits{T}) where T = chunk(m₁) < chunk(m₂)
 # Initializers
 Base.zero(m::Bits{T}) where T = Bits{T}(zero(T))
 Base.similar(m::Bits{T}) where T = zero(m)
-Base.similar(m::Bits, ::Type{Bool}) = similar(m)
 
 # Fast Base array operations
 Base.any(m::Bits) = !iszero(chunk(m))
@@ -104,8 +103,7 @@ _peel(a::Integer) = (Bool(a & one(a)), a >> 1)
 # Specialize broadcasting of logical operations,
 # arbitrary ones are harder because of variable length issue
 Base.broadcasted(::Broadcast.DefaultArrayStyle{1}, ::typeof(~), m::Bits) = Bits(~chunk(m))
-
-Base.broadcasted(bs::Broadcast.DefaultArrayStyle{1}, ::typeof(!), m::Bits) = broadcasted(bs, ~, m)
+Base.broadcasted(bs::Broadcast.DefaultArrayStyle{1}, ::typeof(!), m::Bits) = Base.broadcasted(bs, ~, m)
 
 for op in (:&, :|, :xor)
     @eval function Base.broadcasted(::Broadcast.DefaultArrayStyle{1}, ::typeof($op), m₁::Bits{T}, m₂::Bits{T}) where T 

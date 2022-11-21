@@ -43,6 +43,7 @@ custom_types = (UInt256, UInt512, UInt1024)
     @test convert(T, v .& w) === x & y
     @test convert(T, v .| w) === x | y
     @test convert(T, v .⊻ w) === x ⊻ y
+    @test convert(T, .!v) === ~x
 
     # Bitrotate not defined for BitIntegers
     if T in base_types 
@@ -154,6 +155,10 @@ end
     @test sign(P₁) === sign(P₁') === 1
     @test sign(P₂) === sign(P₂') === 1
 
+    # Test conversion to `Vector`
+    @test Vector(P₁) == Vector(P₂) == p
+    @test Vector(P₁') == Vector(P₂') == invperm(p)
+
     # Test random permutations
     for _ in 1:10
         n = rand(1:bitsize(T))
@@ -174,8 +179,8 @@ end
         p = randperm(bitsize(T))
         P = BitPermutation{T}(p)
         arr = rand(T, 1000)
-        @test P.(arr) == bitpermute.(arr, P) == [bitpermute(x, P) for x in arr]
-        @test P'.(arr) == invbitpermute.(arr, P) == [invbitpermute(x, P) for x in arr]
+        @test P.(arr) == bitpermute.(arr, P) == invbitpermute.(arr, P') == [bitpermute(x, P) for x in arr]
+        @test P'.(arr) == invbitpermute.(arr, P) == bitpermute.(arr, P') == [invbitpermute(x, P) for x in arr]
     end 
 end
 

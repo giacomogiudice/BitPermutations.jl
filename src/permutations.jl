@@ -96,7 +96,7 @@ Base.adjoint(perm::AbstractBitPermutation) = AdjointBitPermutation(perm)
 @inline invbitpermute(x, P::AdjointBitPermutation) = bitpermute(x, P.parent)
 
 Base.broadcasted(::typeof(bitpermute), x::AbstractArray, P::AdjointBitPermutation) = Base.broadcasted(invbitpermute, x, P.parent)
-Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, P::AdjointBitPermutation) = broadcasted(bitpermute, x, P.parent)
+Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, P::AdjointBitPermutation) = Base.broadcasted(bitpermute, x, P.parent)
 
 Base.Vector(P::AdjointBitPermutation) = invperm(Vector(P.parent))
 

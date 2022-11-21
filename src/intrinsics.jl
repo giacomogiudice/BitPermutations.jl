@@ -4,18 +4,13 @@
 Tests if the processor supports hardware BMI2 instructions.
 """
 function has_bmi2()
-    CPUInfo = zeros(Int32, 4)
+    Sys.ARCH ≡ :x86_64 || return false
+    
     # Explanation:
     # https://stackoverflow.com/questions/32214843/compiler-macro-to-detect-bmi2-instruction-set
-    if Sys.ARCH === :x86_64
-        try
-            ccall(:jl_cpuidex, Cvoid, (Ptr{Cint}, Cint, Cint), CPUInfo, 7, 0)
-            return !iszero(CPUInfo[2] & 0x100)
-        catch err
-            @warn "Failed to query CPU information. $(err.msg)"
-        end
-    end
-    return false
+    CPUInfo = zeros(Int32, 4)
+    ccall(:jl_cpuidex, Cvoid, (Ptr{Cint}, Cint, Cint), CPUInfo, 7, 0)
+    return !iszero(CPUInfo[2] & 0x100)
 end
 
 """
