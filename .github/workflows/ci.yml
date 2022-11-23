@@ -8,14 +8,14 @@ on:
 
 jobs:
   test:
+    name: ${{ matrix.julia-version }} - ${{ matrix.julia-arch }}
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.julia-version == 'nightly' }}
     strategy:
       fail-fast: false
       matrix:
-        julia-version: ['1.5','1.6','1.7','1.8']
-        bmi2: [true, false]
-    env:
-      BP_USE_BMI2: ${{matrix.bmi2}}
+        julia-version: ['1.5','1.6','1.7','1.8','nightly']
+        julia-arch: [x64, x86]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -23,7 +23,8 @@ jobs:
       - name: Setup Julia
         uses: julia-actions/setup-julia@v1
         with:
-          version: ${{matrix.julia-version}}
+          version: ${{ matrix.julia-version }}
+          arch: ${{ matrix.julia-arch }}
 
       - name: Build package
         uses: julia-actions/julia-buildpkg@latest
@@ -34,4 +35,4 @@ jobs:
       - name: Upload coverage
         uses: julia-actions/julia-uploadcodecov@latest
         env:
-          CODECOV_TOKEN: ${{secrets.CODECOV_TOKEN}}
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
