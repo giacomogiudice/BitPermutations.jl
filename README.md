@@ -38,7 +38,7 @@ p(x)              # idem
 ```
 
 To inspect the result, we can use `bitstring`, or we can use a `Bits` (defined by the package).
-It is basically a faster `BitVector`, since its size if fixed (but is mutable).
+It is basically a faster `BitVector`, since its size is fixed (but is mutable).
 ```julia
 mb = Bits(x)
 
@@ -54,7 +54,7 @@ invbitpermute(x, p) === p'(x)
 ```
 
 Internally, a `Vector` of bit masks and shifts are stored and then applied sequentially at each call to `bitpermute`.
-If you need to apply the permutation to an array of data, use broacasting as it is optimized to be faster than performing the permutations individually
+If you need to apply the permutation to an array of data, use broacasting, as it is optimized to be faster than performing the permutations individually
 ```julia
 xs = rand(T, 10)
 
