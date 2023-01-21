@@ -122,9 +122,9 @@ For a more in-depth explanation, the wonderful [https://programming.sirrida.de/b
 Two different ways are performing the permutation are implemented: rearranged **Beneš networks** and **GRP networks**.
 The latter is only faster on CPUs which support the [BMI2](https://en.wikipedia.org/wiki/X86_Bit_manipulation_instruction_set) instruction set.
 Hence, the permutation is constructed using a `BenesNetwork{T}`, unless `T<:Union{UInt32,UInt64}` and BMI2 instructions are supported, in which case it uses a `GRPNetwork{T}`.
-BMI2 intrinsics can be disabled by setting `ENV["PB_USE_BMI2"] = false` before loading the package or setting
+BMI2 intrinsics can be disabled by setting `ENV["BP_USE_BMI2"] = false` before loading the package or setting
 ```bash
-export PB_USE_BMI2=false
+export BP_USE_BMI2=false
 ```
 before launching Julia.
 
@@ -132,8 +132,9 @@ before launching Julia.
 A Beneš network is a series of **butterfly** or **delta-swap** operations, in which each node can be swapped or not with the corresponding node shifted by a fixed amount *δ*.
 These operations are arranged in pairs, in a nested fashion, with the shifts chosen to be powers of two.
 
-<img src="./network.png" alt="Beneš network" width=320/>
-
+<p align="center">
+  <img src="./network.svg" alt="Beneš network" width=480/>
+</p>
 Above is an example of a network with 8 nodes, with 3 different stages (pairs of reshuffling) which have as *δ* respectively 4, 2, 1.
 The two innermost operations can always be fused into a single one.
 
@@ -164,7 +165,7 @@ The construction of the masks follows the algorithm in: R. Lee, Z. Shi, X. Yang,
 Several improvements could be made.
 Here I just list the first ones off the top of my head:
 
-- **Use ARM64-specific instructions** It would be nice to improve performance on ARM processors by exploiting intrinsics. There is no `PEXT/PDEP` equivalent, but there are some interesting possibilities described [here](https://developer.arm.com/documentation/102159/0400/Permutation---Neon-instructions)
+- **Use ARM64-specific instructions** It would be nice to improve performance on ARM processors by exploiting intrinsics. There is no `PEXT/PDEP` equivalent, but there are some interesting possibilities described [here](https://developer.arm.com/documentation/102159/0400/Permutation---Neon-instructions).
 - **Preconditioning** A simple way of reducing the depth of the network is to try cheap operations like `bitreverse` and `bitshift` before or after the network to try to save masks. This is what is done [here](https://programming.sirrida.de/calcperm.php).
 - **Lookup tables** Small permutations could benefit from doing sub-permutations with a precomputed table. One could use `pext` to extract say 8 bits at a time, look up their permutation in a table of 256 elements, and join the results with `|`. This approach is fast but scales linearly with size, both in time and space, so it is interesting for permutations on `UInt8`s, `UInt16`s and possibly `UInt32`s.
 - **PSHUFB** The [PSHUFB](https://www.chessprogramming.org/SSSE3#PSHUFB) instruction is part of SSE3 and can perform arbitrary byte reshufflings. It could be used to compress a bunch of layers or combined with lookup tables for some very promising speedups.
