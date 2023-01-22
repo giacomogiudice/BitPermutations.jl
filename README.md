@@ -135,6 +135,7 @@ These operations are arranged in pairs, in a nested fashion, with the shifts cho
 <p align="center">
   <img src="./network.svg" alt="Beneš network" width=480/>
 </p>
+
 Above is an example of a network with 8 nodes, with 3 different stages (pairs of reshuffling) which have as *δ* respectively 4, 2, 1.
 The two innermost operations can always be fused into a single one.
 
