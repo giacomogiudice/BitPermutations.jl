@@ -189,7 +189,8 @@ function invbitpermute(x::Number, net::BenesNetwork{T}) where T
     end
 end
 
-function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, net::BenesNetwork)    return foldl(Iterators.reverse(net.params); init=x) do x′, (mask, shift)
+function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, net::BenesNetwork)
+    return foldl(Iterators.reverse(net.params); init=x) do x′, (mask, shift)
         return deltaswap.(x′, mask, shift)
     end
 end
@@ -273,7 +274,8 @@ function invbitpermute(x::Number, net::GRPNetwork{T}) where T
     end
 end
 
-function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, net::GRPNetwork)    return foldl(Iterators.reverse(net.params); init=x) do x′, args
+function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, net::GRPNetwork)
+    return foldl(Iterators.reverse(net.params); init=x) do x′, args
         return invgrpswap.(x′, args...)
     end
 end
