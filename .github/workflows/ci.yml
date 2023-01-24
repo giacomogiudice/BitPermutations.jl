@@ -29,6 +29,9 @@ jobs:
       - name: Build package
         uses: julia-actions/julia-buildpkg@v1
 
+      - name: Check formatting
+        uses: julia-actions/julia-format@v1
+
       - name: Run tests
         uses: julia-actions/julia-runtest@v1
 

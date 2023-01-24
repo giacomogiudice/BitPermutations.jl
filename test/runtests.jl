@@ -8,7 +8,7 @@ using Test
 Random.seed!(42)
 
 # For permutations it is more natural to think of bits from left to right
-bitstr(x) = reverse(bitstring(x)) 
+bitstr(x) = reverse(bitstring(x))
 
 # Check if using BMI2
 @info "USE_BMI2 = $(BitPermutations.USE_BMI2), ENV[\"BP_USE_BMI2\"] = $(get(ENV, "BP_USE_BMI2", nothing))"
@@ -20,7 +20,7 @@ custom_types = (UInt256, UInt512, UInt1024)
 
 @testset "Bits{$T}" for T in (base_types..., custom_types...)
     x = rand(T)
-    @test (@inferred bitsize(x)) === 8*sizeof(x)
+    @test (@inferred bitsize(x)) === 8 * sizeof(x)
 
     # Construction
     v = @inferred Bits(x)
@@ -46,7 +46,7 @@ custom_types = (UInt256, UInt512, UInt1024)
     @test convert(T, .!v) === ~x
 
     # Bitrotate not defined for BitIntegers
-    if T in base_types 
+    if T in base_types
         i = rand(axes(x, 1))
         @test convert(T, circshift(v, i)) === bitrotate(x, i)
     end
@@ -63,16 +63,17 @@ end
 @testset "Primitives for type $T" for T in (base_types..., custom_types...)
     # Simple deltaswaps
     a, b, c, d, e = T(1), T(2), T(3), T(5), T(12)
-    @test [bitstr(x)[1:4] for x ∈ (a, b, c, d, e)] == ["1000","0100","1100","1010","0011"]
+    @test [bitstr(x)[1:4] for x in (a, b, c, d, e)] == ["1000", "0100", "1100", "1010", "0011"]
     @test (@inferred deltaswap(a, a, 1)) === b     # 1̄000... -> 0100...
     @test (@inferred deltaswap(d, b, 1)) === c     # 10̄10... -> 1100...
     @test (@inferred deltaswap(c, c, 2)) === e     # 1̄1̄00... -> 0011...
-    
+
     # Compare with array version
     for _ in 1:20
         x = rand(T)
         s = rand(1:4)
-        m = rand(T); m = (m & ~(m << s)) >> s
+        m = rand(T)
+        m = (m & ~(m << s)) >> s
         v = @inferred deltaswap(Bits(x), Bits(m), s)
         v′ = @inferred Bits(deltaswap(x, m, s))
         @test v == v′
@@ -81,7 +82,7 @@ end
 
     # GRP swaps
     a, b, c, d, e = T(1), T(2), T(3), T(6), T(14)
-    @test [bitstr(x)[1:4] for x ∈ (a, b, c, d, e)] == ["1000","0100","1100","0110","0111"]
+    @test [bitstr(x)[1:4] for x in (a, b, c, d, e)] == ["1000", "0100", "1100", "0110", "0111"]
     @test (@inferred grpswap(a, ~c)) === a     # 1̄000... -> 1000...
     @test (@inferred grpswap(b, ~b)) === a     # 1̄000... -> 1000...
     @test (@inferred grpswap(d, ~e)) === c     # 1̄11̄1... -> 1100...
@@ -181,7 +182,7 @@ end
         arr = rand(T, 1000)
         @test P.(arr) == bitpermute.(arr, P) == invbitpermute.(arr, P') == [bitpermute(x, P) for x in arr]
         @test P'.(arr) == invbitpermute.(arr, P) == bitpermute.(arr, P') == [invbitpermute(x, P) for x in arr]
-    end 
+    end
 end
 
 @testset "BitPermutation{$T}" for T in custom_types

@@ -19,35 +19,35 @@ struct BitPermutation{T,P<:PermutationNetwork{T}} <: AbstractBitPermutation{T}
     network::P
 
     function BitPermutation{T}(perm::Vector{Int}, net::P) where {T,P<:PermutationNetwork{T}}
-        new{T,P}(perm, net)
+        return new{T,P}(perm, net)
     end
 end
 
 """
     BitPermutation{T}(p::AbstractVector{Int}; type=[DEFAULT_TYPE], [...])
 
-Construct a `BitPermutation{T}` from permutation vector `p`. 
+Construct a `BitPermutation{T}` from permutation vector `p`.
 The type of algorithm can be specified by the `type` keyword argument.
-If none is provided, `BenesNetwork` is chosen, unless `T<:Union{UInt32,UInt64}` and 
+If none is provided, `BenesNetwork` is chosen, unless `T<:Union{UInt32,UInt64}` and
 BMI2 instructions are supported by the processor, in which case a `GRPNetwork` is chosen.
 
 See also: [`BenesNetwork`](@ref), [`GRPNetwork`](@ref).
 """
-function BitPermutation{T}(p::AbstractVector{Int}; type::Type=_default_type(T), kwargs...) where T
+function BitPermutation{T}(p::AbstractVector{Int}; type::Type=_default_type(T), kwargs...) where {T}
     perm = collect(p)
     net = (type){T}(perm; kwargs...)
-    return BitPermutation{T}(perm, net) 
+    return BitPermutation{T}(perm, net)
 end
 
-_default_type(::Type{T}) where T<:Union{UInt32,UInt64} = ifelse(USE_BMI2, GRPNetwork, BenesNetwork)
-_default_type(_::Type{T}) where T = BenesNetwork
+_default_type(::Type{T}) where {T<:Union{UInt32,UInt64}} = ifelse(USE_BMI2, GRPNetwork, BenesNetwork)
+_default_type(_::Type{T}) where {T} = BenesNetwork
 
-Base.show(io::IO, ::BitPermutation{T}) where T = print(io, "BitPermutation{$T}")
+Base.show(io::IO, ::BitPermutation{T}) where {T} = print(io, "BitPermutation{$T}")
 
-function Base.show(io::IO, ::MIME"text/plain", P::BitPermutation{T}) where T
+function Base.show(io::IO, ::MIME"text/plain", P::BitPermutation{T}) where {T}
     println(io, "BitPermutation{$T} with network $(P.network):")
     foreach(cycles(P)) do cycle
-        length(cycle) === 1 && return
+        length(cycle) === 1 && return nothing
         print(io, "(")
         join(io, cycle, " ")
         print(io, ")")
@@ -77,14 +77,19 @@ See also [`bitpermute`](@ref).
 """
 @inline invbitpermute(x, P::BitPermutation) = invbitpermute(x, P.network)
 
-@inline Base.broadcasted(f::Union{typeof(bitpermute),typeof(invbitpermute)}, x::AbstractArray, P::BitPermutation) = Base.broadcasted(f, x, P.network)
+@inline function Base.broadcasted(
+    f::Union{typeof(bitpermute),typeof(invbitpermute)}, x::AbstractArray, P::BitPermutation
+)
+    return Base.broadcasted(f, x, P.network)
+end
 
 Base.Vector(P::BitPermutation) = P.vector
 
 """
     AdjointBitPermutation{T,P}
 
-Represents the adjoint permutation of type `P`, where the regular and inverse permutation are swapped.
+Represents the adjoint permutation of type `P`, where the regular and inverse permutation are 
+swapped.
 """
 struct AdjointBitPermutation{T,P<:AbstractBitPermutation{T}} <: AbstractBitPermutation{T}
     parent::P
@@ -95,8 +100,12 @@ Base.adjoint(perm::AbstractBitPermutation) = AdjointBitPermutation(perm)
 @inline bitpermute(x, P::AdjointBitPermutation) = invbitpermute(x, P.parent)
 @inline invbitpermute(x, P::AdjointBitPermutation) = bitpermute(x, P.parent)
 
-Base.broadcasted(::typeof(bitpermute), x::AbstractArray, P::AdjointBitPermutation) = Base.broadcasted(invbitpermute, x, P.parent)
-Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, P::AdjointBitPermutation) = Base.broadcasted(bitpermute, x, P.parent)
+function Base.broadcasted(::typeof(bitpermute), x::AbstractArray, P::AdjointBitPermutation)
+    return Base.broadcasted(invbitpermute, x, P.parent)
+end
+function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, P::AdjointBitPermutation)
+    return Base.broadcasted(bitpermute, x, P.parent)
+end
 
 Base.Vector(P::AdjointBitPermutation) = invperm(Vector(P.parent))
 
@@ -144,10 +153,11 @@ cycles(P::AbstractBitPermutation) = Cycles(Vector(P))
 """
     order(P::AbstractBitPermutation)
 
-Return the order of the permutation `P`, i.e. the amount of times you have to apply the permutation to obtain the trivial permutation.
+Return the order of the permutation `P`, i.e. the amount of times you have to apply the permutation
+to obtain the trivial permutation.
 
 See also [`isodd`](@ref), [`iseven`](@ref) to compute the parity.
-"""    
+"""
 order(P::AbstractBitPermutation) = mapreduce(length, lcm, cycles(P); init=1)
 
 """
@@ -156,7 +166,6 @@ order(P::AbstractBitPermutation) = mapreduce(length, lcm, cycles(P); init=1)
 Returns the sign of the permutation `P`, +1 (-1) if it is of even (odd) parity.
 
 See also [`isodd`](@ref), [`iseven`](@ref).
-
 """
 Base.sign(P::AbstractBitPermutation) = ifelse(isodd(P), -1, +1)
 
@@ -167,8 +176,12 @@ Returns a `Bool` corresponding to whether or not the parity of the permutation i
 
 See also [`iseven`](@ref).
 """
-Base.isodd(P::BitPermutation{T,BenesNetwork{T}}) where T = isodd(count_ones(mapreduce(first, ⊻, P.network.params; init=zero(T))))
-Base.isodd(P::BitPermutation{T,GRPNetwork{T}}) where T = isodd(count_ones(mapreduce(first, ⊻, P.network.params; init=zero(T))))
+function Base.isodd(P::BitPermutation{T,BenesNetwork{T}}) where {T}
+    return isodd(count_ones(mapreduce(first, ⊻, P.network.params; init=zero(T))))
+end
+function Base.isodd(P::BitPermutation{T,GRPNetwork{T}}) where {T}
+    return isodd(count_ones(mapreduce(first, ⊻, P.network.params; init=zero(T))))
+end
 Base.isodd(P::AdjointBitPermutation) = isodd(P.parent)
 Base.isodd(P::AbstractBitPermutation) = mapreduce(isodd ∘ length, ⊻, cycles(P); init=false)
 
