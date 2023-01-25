@@ -7,8 +7,9 @@ on:
     branches: [master]
 
 jobs:
-  Build:
-    name: ${{ matrix.julia-version }} - ${{ matrix.julia-arch }}
+  build:
+    name: Julia ${{ matrix.julia-version }} - ${{ matrix.julia-arch }}
+    needs: style-check
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.julia-version == 'nightly' }}
     strategy:
@@ -42,7 +43,8 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-  CodeStyle:
+  style-check:
+    name: Style check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -57,6 +59,7 @@ jobs:
         run: |
           using Pkg
           Pkg.add("JuliaFormatter")
+
           using JuliaFormatter
           formatted = JuliaFormatter.format(".", verbose=true)
 
@@ -76,9 +79,11 @@ jobs:
       - name: Run Aqua
         run: |
           using Pkg
-          using Aqua
+          Pkg.add("Aqua")
           project = Pkg.project()
           name = project.name
+
+          using Aqua
           @eval using $name
           Aqua.test_all(@eval $name)
         shell: julia --project=@. --color=yes --compiled-modules=no --optimize=0 {0}
