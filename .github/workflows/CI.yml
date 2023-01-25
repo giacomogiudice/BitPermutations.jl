@@ -81,7 +81,7 @@ jobs:
           using Pkg
           Pkg.add("Aqua")
           project = Pkg.project()
-          name = project.name
+          name = Symbol(project.name)
 
           using Aqua
           @eval using $name
