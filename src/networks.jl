@@ -8,7 +8,7 @@ abstract type PermutationNetwork{T} end
 """
     BenesNetwork{T}
 
-Represents a Beneš network, which is a series of `deltaswap` operations with specified shifts and 
+Represents a Beneš network, which is a series of `deltaswap` operations with specified shifts and
 masks.
 """
 struct BenesNetwork{T} <: PermutationNetwork{T}
