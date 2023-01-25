@@ -80,11 +80,12 @@ jobs:
         run: |
           using Pkg
           Pkg.add("Aqua")
+          Pkg.activate(".")
           project = Pkg.project()
           name = Symbol(project.name)
 
           using Aqua
           @eval using $name
           Aqua.test_all(@eval $name)
-        shell: julia --project=@. --color=yes --compiled-modules=no --optimize=0 {0}
+        shell: julia --color=yes --compiled-modules=no --optimize=0 {0}
 
