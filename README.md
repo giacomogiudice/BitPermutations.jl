@@ -1,8 +1,10 @@
 # BitPermutations.jl
 
 [![CI](https://github.com/giacomogiudice/BitPermutations.jl/workflows/CI/badge.svg)](https://github.com/giacomogiudice/BitPermutations.jl/actions?query=workflow%3ACI)
-[![codecov](https://codecov.io/gh/giacomogiudice/BitPermutations.jl/branch/master/graph/badge.svg?token=G71Y9FQH6K)](https://codecov.io/gh/giacomogiudice/BitPermutations.jl?token=G71Y9FQH6K)
-[![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE.md)
+[![CodeCov](https://codecov.io/gh/giacomogiudice/BitPermutations.jl/branch/master/graph/badge.svg?token=G71Y9FQH6K)](https://codecov.io/gh/giacomogiudice/BitPermutations.jl?token=G71Y9FQH6K)
+[![Code Style](https://img.shields.io/badge/code%20style-blue-4495d1.svg)](https://github.com/invenia/BlueStyle)
+[![Aqua](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
+[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE.md)
 
 Efficient routines for repeated bit permutations.
 
