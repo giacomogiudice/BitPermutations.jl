@@ -1,0 +1,49 @@
+name: CodeStyle
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  CodeStyle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: 1.8
+
+      - name: Run JuliaFormatter
+        run: |
+          using Pkg
+          Pkg.add("JuliaFormatter")
+          using JuliaFormatter
+          formatted = JuliaFormatter.format(".", verbose=true)
+
+          if formatted
+            @info "All files match designated style"
+            exit(0)
+          else
+            @error "Some files do not match the designated style"
+            write(stdout, read(`git diff`, String))
+            exit(1)
+          end
+        shell: julia --color=yes --compiled-modules=no --optimize=0 {0}
+
+      - name: Build package
+        uses: julia-actions/julia-buildpkg@v1
+
+      - name: Run Aqua
+        run: |
+          using Pkg
+          using Aqua
+          project = Pkg.project()
+          name = project.name
+          @eval using $name
+          Aqua.test_all(@eval $name)
+        shell: julia --project=@. --color=yes --compiled-modules=no --optimize=0 {0}
