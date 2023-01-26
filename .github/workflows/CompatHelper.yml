@@ -11,9 +11,9 @@ jobs:
     steps:
       - name: Run CompatHelper
         run: |
-          import Pkg
+          using Pkg
           Pkg.add("CompatHelper")
-          import CompatHelper
+          using CompatHelper
           CompatHelper.main()
         shell: julia --color=yes --compiled-modules=no {0}
         env:

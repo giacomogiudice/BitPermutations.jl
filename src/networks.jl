@@ -8,25 +8,26 @@ abstract type PermutationNetwork{T} end
 """
     BenesNetwork{T}
 
-Represents a Beneš network, which is a series of `deltaswap` operations with specified shifts and masks.
+Represents a Beneš network, which is a series of `deltaswap` operations with specified shifts and
+masks.
 """
 struct BenesNetwork{T} <: PermutationNetwork{T}
     params::Vector{Tuple{T,Int}}
 end
 
-function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearrange::Bool=true) where T
+function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearrange::Bool=true) where {T}
     n = length(perm)
     n ≤ bitsize(T) || throw(OverflowError("Permutation is too long for Type $T"))
     isperm(perm) || throw(ArgumentError("Input vector is not a permutation"))
 
     # Pad permutation vector
-    p = [collect(perm); n+1:bitsize(T)]
+    p = [collect(perm); (n + 1):bitsize(T)]
 
     # Use `trailing_zeros` to compute the log2 quickly
-    shifts = reverse!([2^i for i in 0:trailing_zeros(bitsize(T)÷2)])
+    shifts = reverse!([2^i for i in 0:trailing_zeros(bitsize(T) ÷ 2)])
 
     # Initialize masks
-    masks = Vector{Bits{T}}(undef, 2*length(shifts) - 1)
+    masks = Vector{Bits{T}}(undef, 2 * length(shifts) - 1)
 
     # Fill with garbage so they are all computed the first time
     prevshifts = zeros(Int, length(shifts))
@@ -44,12 +45,12 @@ function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearran
         for (index, shift) in enumerate(shifts)
             # Avoid recomputing masks if same shift as before
             if !(cached && shift == prevshifts[index])
-                _setstagemasks!(masks, shifts, target, index)
+                _set_stage_masks!(masks, shifts, target, index)
                 cached = false
             end
             # Compute permutation for next stage
             if index ≠ lastindex(shifts)
-                mask_forward, mask_backward = masks[index], masks[end-index+1]
+                mask_forward, mask_backward = masks[index], masks[end - index + 1]
                 p_forward = deltaswap(source, mask_forward, shift)
                 p_backward = deltaswap(target, mask_backward, shift)
                 target = p_forward[p_backward]
@@ -70,12 +71,14 @@ function BenesNetwork{T}(perm::AbstractVector{Int}; verbose::Bool=false, rearran
     # Extract parameters
     shifts = bestshifts
     masks = bestmasks
-    deltas = [shifts; reverse!(shifts[begin:end-1])]
+    deltas = [shifts; reverse!(shifts[begin:(end - 1)])]
 
     return BenesNetwork([(chunk(m), δ) for (m, δ) in zip(masks, deltas) if any(m)])
 end
 
-function _setstagemasks!(masks::AbstractVector{Bits{T}}, shifts::AbstractVector{Int}, p::AbstractVector{Int}, index::Int) where T
+function _set_stage_masks!(
+    masks::AbstractVector{Bits{T}}, shifts::AbstractVector{Int}, p::AbstractVector{Int}, index::Int
+) where {T}
     # All nodes must be repartitioned in two sets with the same number of elements
     # encoded with {true|false}, corresponding to which partition they are destined to
     n = length(p)
@@ -86,7 +89,7 @@ function _setstagemasks!(masks::AbstractVector{Bits{T}}, shifts::AbstractVector{
     # Keeps track of visited nodes
     visited = Bits(zero(T))
     # Partition of next stage
-    partition = Bits{T}(c for _ in 1:(n÷2shift) for c in 0:1 for _ in 1:shift)
+    partition = Bits{T}(c for _ in 1:(n ÷ 2shift) for c in 0:1 for _ in 1:shift)
     # Instantiate masks
     mask_forward = Bits(zero(T))
     mask_backward = Bits(zero(T))
@@ -96,13 +99,13 @@ function _setstagemasks!(masks::AbstractVector{Bits{T}}, shifts::AbstractVector{
     for (j, pⱼ) in enumerate(p)
         if pⱼ === j
             i = j
-            break 
+            break
         end
     end
 
     # Encodes the beginning of each cycle
     i₀ = i
-    
+
     @inbounds while !isnothing(i)
         # Heuristic to have fewer masks: try to not reshuffle indices
         color = partition[i₀]
@@ -144,7 +147,7 @@ function _setstagemasks!(masks::AbstractVector{Bits{T}}, shifts::AbstractVector{
     # Set masks
     if index ≠ lastindex(shifts)
         masks[index] = mask_forward
-        masks[end-index+1] = mask_backward
+        masks[end - index + 1] = mask_backward
     else
         # Last index: merge the innermost masks
         masks[index] = mask_forward .⊻ mask_backward
@@ -154,7 +157,7 @@ function _setstagemasks!(masks::AbstractVector{Bits{T}}, shifts::AbstractVector{
 end
 
 # Moves bits in mask to MSB position 
-function _normalize_mask(mask::Bits{T}, partition::Bits{T}, shift::Int) where T
+function _normalize_mask(mask::Bits{T}, partition::Bits{T}, shift::Int) where {T}
     m = chunk(mask)
     p = chunk(partition)
     return Bits{T}(((m >> shift) | m) & ~p)
@@ -171,7 +174,7 @@ end
 
 Base.show(io::IO, net::BenesNetwork) = print(io, "$(typeof(net)) with $(length(net.params)) operations")
 
-function bitpermute(x::Number, net::BenesNetwork{T}) where T
+function bitpermute(x::Number, net::BenesNetwork{T}) where {T}
     return foldl(net.params; init=convert(T, x)) do x′, (mask, shift)
         return deltaswap(x′, mask, shift)
     end
@@ -183,7 +186,7 @@ function Base.broadcasted(::typeof(bitpermute), x::AbstractArray, net::BenesNetw
     end
 end
 
-function invbitpermute(x::Number, net::BenesNetwork{T}) where T
+function invbitpermute(x::Number, net::BenesNetwork{T}) where {T}
     return foldl(Iterators.reverse(net.params); init=convert(T, x)) do x′, (mask, shift)
         return deltaswap(x′, mask, shift)
     end
@@ -205,14 +208,14 @@ struct GRPNetwork{T} <: PermutationNetwork{T}
 end
 
 # Algorithm explained in https://programming.sirrida.de/bit_perm.html#lee_sag
-function GRPNetwork{T}(perm::AbstractVector{Int}) where T
+function GRPNetwork{T}(perm::AbstractVector{Int}) where {T}
     n = length(perm)
     n ≤ bitsize(T) || throw(OverflowError("Permutation is too long for Type $T"))
     isperm(perm) || throw(ArgumentError("Input vector is not a permutation"))
-    USE_BMI2 || @warn "Not using BMI2 instructions, performance may be limited" maxlog=1
+    USE_BMI2 || @warn "Not using BMI2 instructions, performance may be limited" maxlog = 1
 
     # Pad permutation vector
-    p = [collect(perm); n+1:bitsize(T)]
+    p = [collect(perm); (n + 1):bitsize(T)]
 
     # Build partial lists of indices
     lists = [Int[]]
@@ -234,10 +237,10 @@ function GRPNetwork{T}(perm::AbstractVector{Int}) where T
         nhalf = length(lists) ÷ 2
         mergedlists = Vector{Vector{Int}}(undef, nhalf)
         partialmasks = Vector{BitVector}(undef, nhalf)
-        
+
         # Sequentially merge the lists
         for k in 1:nhalf
-            l, r = lists[k], lists[k+nhalf]
+            l, r = lists[k], lists[k + nhalf]
             mergedlists[k] = [l; r]
             partialmasks[k] = [falses(length(l)); trues(length(r))]
             inds = sortperm(mergedlists[k])
@@ -256,19 +259,19 @@ end
 
 Base.show(io::IO, net::GRPNetwork) = print(io, "$(typeof(net)) with $(length(net.params)) operations")
 
-function bitpermute(x::Number, net::GRPNetwork{T}) where T
+function bitpermute(x::Number, net::GRPNetwork{T}) where {T}
     return foldl(net.params; init=convert(T, x)) do x′, args
         return grpswap(x′, args...)
     end
 end
 
-function Base.broadcasted(::typeof(bitpermute), x::AbstractArray, net::GRPNetwork)    
+function Base.broadcasted(::typeof(bitpermute), x::AbstractArray, net::GRPNetwork)
     return foldl(net.params; init=x) do x′, args
         return grpswap.(x′, args...)
     end
 end
 
-function invbitpermute(x::Number, net::GRPNetwork{T}) where T
+function invbitpermute(x::Number, net::GRPNetwork{T}) where {T}
     return foldl(Iterators.reverse(net.params); init=convert(T, x)) do x′, args
         return invgrpswap(x′, args...)
     end
