@@ -7,7 +7,17 @@ abstract type AbstractBitPermutation{T} end
 
 (perm::AbstractBitPermutation)(x) = bitpermute(x, perm)
 
-Base.broadcasted(P::AbstractBitPermutation, x) = Base.broadcasted(bitpermute, x, P)
+Base.map(P::AbstractBitPermutation{T}, x::AbstractArray{T}) where {T} = bitpermute_elementwise(x, P)
+Base.map!(P::AbstractBitPermutation{T}, x::AbstractArray{T}) where {T} = bitpermute_elementwise!(x, P)
+Base.map!(P::AbstractBitPermutation{T}, y::AbstractArray{T}, x::AbstractArray{T}) where {T} = y .= map(x, P)
+
+function Base.broadcasted(::typeof(bitpermute), x::AbstractArray{T}, P::AbstractBitPermutation{T}) where {T}
+    return bitpermute_elementwise(x, P)
+end
+
+function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray{T}, P::AbstractBitPermutation{T}) where {T}
+    return invbitpermute_elementwise(x, P)
+end
 
 """
     BitPermutation{T,A}
@@ -64,7 +74,7 @@ Callable as well as `p(x)`.
 
 See also [`invbitpermute`](@ref).
 """
-@inline bitpermute(x, P::BitPermutation) = bitpermute(x, P.network)
+bitpermute(x, P::BitPermutation{T}) where {T} = bitpermute(convert(T, x), P.network)
 
 """
     invbitpermute(x, p::AbstractBitPermutation)
@@ -75,13 +85,12 @@ Callable as well as `p'(x)`.
 
 See also [`bitpermute`](@ref).
 """
-@inline invbitpermute(x, P::BitPermutation) = invbitpermute(x, P.network)
+invbitpermute(x, P::BitPermutation{T}) where {T} = invbitpermute(convert(T, x), P.network)
 
-@inline function Base.broadcasted(
-    f::Union{typeof(bitpermute),typeof(invbitpermute)}, x::AbstractArray, P::BitPermutation
-)
-    return Base.broadcasted(f, x, P.network)
-end
+bitpermute_elementwise(x::AbstractArray, P::BitPermutation) = bitpermute_elementwise(x, P.network)
+invbitpermute_elementwise(x::AbstractArray, P::BitPermutation) = invbitpermute_elementwise(x, P.network)
+bitpermute_elementwise!(x::AbstractArray, P::BitPermutation) = bitpermute_elementwise!(x, P.network)
+invbitpermute_elementwise!(x::AbstractArray, P::BitPermutation) = invbitpermute_elementwise!(x, P.network)
 
 Base.Vector(P::BitPermutation) = P.vector
 
@@ -97,15 +106,13 @@ end
 
 Base.adjoint(perm::AbstractBitPermutation) = AdjointBitPermutation(perm)
 
-@inline bitpermute(x, P::AdjointBitPermutation) = invbitpermute(x, P.parent)
-@inline invbitpermute(x, P::AdjointBitPermutation) = bitpermute(x, P.parent)
+bitpermute(x, P::AdjointBitPermutation) = invbitpermute(x, P.parent)
+invbitpermute(x, P::AdjointBitPermutation) = bitpermute(x, P.parent)
 
-function Base.broadcasted(::typeof(bitpermute), x::AbstractArray, P::AdjointBitPermutation)
-    return Base.broadcasted(invbitpermute, x, P.parent)
-end
-function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, P::AdjointBitPermutation)
-    return Base.broadcasted(bitpermute, x, P.parent)
-end
+bitpermute_elementwise(x::AbstractArray, P::AdjointBitPermutation) = invbitpermute_elementwise(x, P.parent)
+invbitpermute_elementwise(x::AbstractArray, P::AdjointBitPermutation) = bitpermute_elementwise(x, P.parent)
+bitpermute_elementwise!(x::AbstractArray, P::AdjointBitPermutation) = invbitpermute_elementwise!(x, P.parent)
+invbitpermute_elementwise!(x::AbstractArray, P::AdjointBitPermutation) = bitpermute_elementwise!(x, P.parent)
 
 Base.Vector(P::AdjointBitPermutation) = invperm(Vector(P.parent))
 
