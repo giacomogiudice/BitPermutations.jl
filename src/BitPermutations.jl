@@ -8,7 +8,7 @@ export PermutationNetwork, BenesNetwork, GRPNetwork
 export AbstractBitPermutation, BitPermutation, AdjointBitPermutation
 
 export bitsize
-export bitpermute, invbitpermute
+export bitpermute, invbitpermute, bitpermute!, invbitpermute!
 export cycles, order
 
 include("intrinsics.jl")

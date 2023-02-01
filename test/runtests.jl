@@ -180,8 +180,19 @@ end
         p = randperm(bitsize(T))
         P = BitPermutation{T}(p)
         arr = rand(T, 1000)
+        arr_copy = copy(arr)
         @test P.(arr) == bitpermute.(arr, P) == invbitpermute.(arr, P') == [bitpermute(x, P) for x in arr]
         @test P'.(arr) == invbitpermute.(arr, P) == bitpermute.(arr, P') == [invbitpermute(x, P) for x in arr]
+
+        arr = copy(arr_copy)
+        arr_permuted = P.(arr)
+        @test arr_permuted == (@inferred bitpermute(arr, P))
+        @test arr_permuted == (@inferred bitpermute!(arr, P))
+
+        arr = copy(arr_copy)
+        arr_permuted = P'.(arr)
+        @test arr_permuted == (@inferred bitpermute(arr, P'))
+        @test arr_permuted == (@inferred bitpermute!(arr, P'))
     end
 end
 
@@ -195,5 +206,25 @@ end
         v = bitstr(x)
         @test bitstr(@inferred P(x)) == v[p]
         @test bitstr(@inferred P'(x)) == v[invperm(p)]
+    end
+
+    # Test permutations of arrays
+    for _ in 1:10
+        p = randperm(bitsize(T))
+        P = BitPermutation{T}(p; type=BenesNetwork, rearrange=false)
+        arr = rand(T, 1000)
+        arr_copy = copy(arr)
+        @test P.(arr) == bitpermute.(arr, P) == invbitpermute.(arr, P') == [bitpermute(x, P) for x in arr]
+        @test P'.(arr) == invbitpermute.(arr, P) == bitpermute.(arr, P') == [invbitpermute(x, P) for x in arr]
+
+        arr = copy(arr_copy)
+        arr_permuted = P.(arr)
+        @test arr_permuted == (@inferred bitpermute(arr, P))
+        @test arr_permuted == (@inferred bitpermute!(arr, P))
+
+        arr = copy(arr_copy)
+        arr_permuted = P'.(arr)
+        @test arr_permuted == (@inferred bitpermute(arr, P'))
+        @test arr_permuted == (@inferred bitpermute!(arr, P'))
     end
 end

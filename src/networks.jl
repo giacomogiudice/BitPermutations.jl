@@ -174,30 +174,6 @@ end
 
 Base.show(io::IO, net::BenesNetwork) = print(io, "$(typeof(net)) with $(length(net.params)) operations")
 
-function bitpermute(x::Number, net::BenesNetwork{T}) where {T}
-    return foldl(net.params; init=convert(T, x)) do x′, (mask, shift)
-        return deltaswap(x′, mask, shift)
-    end
-end
-
-function Base.broadcasted(::typeof(bitpermute), x::AbstractArray, net::BenesNetwork)
-    return foldl(net.params; init=x) do x′, (mask, shift)
-        return deltaswap.(x′, mask, shift)
-    end
-end
-
-function invbitpermute(x::Number, net::BenesNetwork{T}) where {T}
-    return foldl(Iterators.reverse(net.params); init=convert(T, x)) do x′, (mask, shift)
-        return deltaswap(x′, mask, shift)
-    end
-end
-
-function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, net::BenesNetwork)
-    return foldl(Iterators.reverse(net.params); init=x) do x′, (mask, shift)
-        return deltaswap.(x′, mask, shift)
-    end
-end
-
 """
     GRPNetwork{T}
 
@@ -259,26 +235,54 @@ end
 
 Base.show(io::IO, net::GRPNetwork) = print(io, "$(typeof(net)) with $(length(net.params)) operations")
 
-function bitpermute(x::Number, net::GRPNetwork{T}) where {T}
-    return foldl(net.params; init=convert(T, x)) do x′, args
-        return grpswap(x′, args...)
+# Generate permutation functions
+for (Network, swap) in (BenesNetwork => deltaswap, GRPNetwork => grpswap)
+    @eval begin
+        function bitpermute(x::T, net::$Network{T}) where {T}
+            return foldl(net.params; init=x) do x′, args
+                return $swap(x′, args...)
+            end
+        end
+
+        function bitpermute_elementwise(x::AbstractArray{T}, net::$Network{T}) where {T}
+            return foldl(net.params; init=x) do x′, args
+                return $swap.(x′, args...)
+            end
+        end
+
+        function bitpermute_elementwise!(x::AbstractArray{T}, net::$Network{T}) where {T}
+            return foldl(net.params; init=x) do x, args
+                @inbounds @simd for i in eachindex(x)
+                    x[i] = $swap(x[i], args...)
+                end
+                return x
+            end
+        end
     end
 end
 
-function Base.broadcasted(::typeof(bitpermute), x::AbstractArray, net::GRPNetwork)
-    return foldl(net.params; init=x) do x′, args
-        return grpswap.(x′, args...)
-    end
-end
+# Generate inverse permutation functions
+for (Network, invswap) in (BenesNetwork => deltaswap, GRPNetwork => invgrpswap)
+    @eval begin
+        function invbitpermute(x::T, net::$Network{T}) where {T}
+            return foldr(net.params; init=x) do args, x′
+                return $invswap(x′, args...)
+            end
+        end
 
-function invbitpermute(x::Number, net::GRPNetwork{T}) where {T}
-    return foldl(Iterators.reverse(net.params); init=convert(T, x)) do x′, args
-        return invgrpswap(x′, args...)
-    end
-end
+        function invbitpermute_elementwise(x::AbstractArray{T}, net::$Network{T}) where {T}
+            return foldr(net.params; init=x) do args, x′
+                return $invswap.(x′, args...)
+            end
+        end
 
-function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray, net::GRPNetwork)
-    return foldl(Iterators.reverse(net.params); init=x) do x′, args
-        return invgrpswap.(x′, args...)
+        function invbitpermute_elementwise!(x::AbstractArray{T}, net::$Network{T}) where {T}
+            return foldr(net.params; init=x) do args, x
+                @inbounds @simd for i in eachindex(x)
+                    x[i] = $invswap(x[i], args...)
+                end
+                return x
+            end
+        end
     end
 end
