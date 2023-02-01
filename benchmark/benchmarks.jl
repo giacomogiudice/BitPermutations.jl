@@ -66,11 +66,11 @@ suite["Broadcasted"] = BenchmarkGroup()
 for T in test_types
     group = suite["Broadcasted"][T] = BenchmarkGroup()
 
-    group["BenesNetwork"] = @benchmarkable map!(p, xs) setup = begin
+    group["BenesNetwork"] = @benchmarkable bitpermute!(p, xs) setup = begin
         xs = rand($T, $N)
         p = benes_perm($T)
     end
-    group["GRPNetwork"] = @benchmarkable map!(p, xs) setup = begin
+    group["GRPNetwork"] = @benchmarkable bitpermute!(p, xs) setup = begin
         xs = rand($T, $N)
         p = grp_perm($T)
     end

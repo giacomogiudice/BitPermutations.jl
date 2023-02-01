@@ -188,11 +188,17 @@ end
         arr_permuted = P.(arr)
         @test arr_permuted == (@inferred bitpermute(arr, P))
         @test arr_permuted == (@inferred bitpermute!(arr, P))
+        arr = copy(arr_copy)
+        @test arr == (@inferred invbitpermute(arr_permuted, P))
+        @test arr == (@inferred invbitpermute!(arr_permuted, P))
 
         arr = copy(arr_copy)
         arr_permuted = P'.(arr)
         @test arr_permuted == (@inferred bitpermute(arr, P'))
         @test arr_permuted == (@inferred bitpermute!(arr, P'))
+        arr = copy(arr_copy)
+        @test arr == (@inferred invbitpermute(arr_permuted, P'))
+        @test arr == (@inferred invbitpermute!(arr_permuted, P'))
     end
 end
 
@@ -221,10 +227,16 @@ end
         arr_permuted = P.(arr)
         @test arr_permuted == (@inferred bitpermute(arr, P))
         @test arr_permuted == (@inferred bitpermute!(arr, P))
+        arr = copy(arr_copy)
+        @test arr == (@inferred invbitpermute(arr_permuted, P))
+        @test arr == (@inferred invbitpermute!(arr_permuted, P))
 
         arr = copy(arr_copy)
         arr_permuted = P'.(arr)
         @test arr_permuted == (@inferred bitpermute(arr, P'))
         @test arr_permuted == (@inferred bitpermute!(arr, P'))
+        arr = copy(arr_copy)
+        @test arr == (@inferred invbitpermute(arr_permuted, P'))
+        @test arr == (@inferred invbitpermute!(arr_permuted, P'))
     end
 end
