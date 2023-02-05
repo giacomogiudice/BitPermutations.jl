@@ -1,7 +1,7 @@
 """
     PermutationNetwork{T}
 
-Abstract type for all bit permutation algorithms.
+Abstract type for all bit-permutation algorithms.
 """
 abstract type PermutationNetwork{T} end
 
