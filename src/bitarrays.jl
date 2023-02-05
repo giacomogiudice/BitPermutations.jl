@@ -33,15 +33,11 @@ end
     Bits(input::T)
     Bits{T}(input::T)
 
-Construct an `Bits` from the bits in `input`.
+Construct a `Bits` from the bits in `input`.
+It is basically a view into the bits of `input`, which can then be manipulated using vector-like
+syntax.
 """
 Bits(input::T) where {T} = Bits{T}(input)
-
-"""
-    Bits{T}(input)
-
-Construct an `Bits` encoding the bits of some array, generator, or iterable in the bits of type `T`.
-"""
 Bits(input::Bits{T}) where {T} = Bits{T}(chunk(input))
 
 # Getter
@@ -53,15 +49,15 @@ Base.size(::Bits{T}) where {T} = (bitsize(T),)
 function Base.getindex(m::Bits{T}, i::Int) where {T}
     @boundscheck checkbounds(m, i)
     a = chunk(m)
-    u = one(T) << (i - 1)
+    u = one(T) << shift_safe(T, i - 1)
     return !iszero(a & u)
 end
 
 function Base.setindex!(m::Bits{T}, x, i::Int) where {T}
     @boundscheck checkbounds(m, i)
     a = chunk(m)
-    u = one(T) << (i - 1)
-    m.chunk = ifelse(convert(Bool, x), a | u, a & ~u)
+    u = one(T) << shift_safe(T, i - 1)
+    m.chunk = convert(Bool, x) ? a | u : a & ~u
     return m
 end
 

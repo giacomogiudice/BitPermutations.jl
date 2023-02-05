@@ -8,15 +8,16 @@ bitsize(::Type{T}) where {T<:Unsigned} = 8 * sizeof(T)
 bitsize(::T) where {T<:Unsigned} = bitsize(T)
 
 """
-    mask_shift(::Type{T}, s::Integer)
+    shift_safe(::Type{T}, s::Integer)
 
-Changes the mask to guarantee it doesn't shift beyond `bitsize(T)`.
+Changes the shifting amount for bitshifts to guarantee to the compiler that the shift amount will
+not exceed `bitsize(T)`.
 Because bit shifting behaves slighly differently in Julia vs. LLVM, this help the compiler emit
 less code.
 
 See also: https://github.com/JuliaLang/julia/issues/30674.
 """
-@inline mask_shift(::Type{T}, s::Integer) where {T} = s & (bitsize(T) - 1)
+@inline shift_safe(::Type{T}, s::Integer) where {T} = s & (bitsize(T) - 1)
 
 """
     deltaswap(x::T, m::T, shift::Integer)
@@ -26,9 +27,9 @@ Swaps bits in `x` selected by mask `m` with ones to the left by an amount specif
 by `shift`. The `AbstractArray` version is not optimized to be fast.
 """
 function deltaswap(x::T, m::T, shift::Integer) where {T<:Unsigned}
-    shift_masked = mask_shift(T, shift)
-    t = ((x >> shift_masked) ⊻ x) & m
-    return x ⊻ t ⊻ (t << shift_masked)
+    shift = shift_safe(T, shift)
+    t = ((x >> shift) ⊻ x) & m
+    return x ⊻ t ⊻ (t << shift)
 end
 
 function deltaswap(x::AbstractVector, m::AbstractVector{Bool}, shift::Integer)
@@ -54,8 +55,8 @@ The `AbstractArray` version is not optimized to be fast.
 See also [`invgrpswap`](@ref).
 """
 function grpswap(x::T, m::T, shift::Integer=count_zeros(m), m̄::T=~m) where {T<:Unsigned}
-    masked_shift = mask_shift(T, shift)
-    return pext(x, m) << masked_shift | pext(x, m̄)
+    shift = shift_safe(T, shift)
+    return pext(x, m) << shift | pext(x, m̄)
 end
 
 function grpswap(x::AbstractVector, m::AbstractVector{Bool})
@@ -72,8 +73,8 @@ Performs the inverse operation of `grpswap`.
 See also [`grpswap`](@ref).
 """
 function invgrpswap(x::T, m::T, shift::Integer=count_zeros(m), m̄::T=~m) where {T<:Unsigned}
-    masked_shift = mask_shift(T, shift)
-    return pdep(x >> masked_shift, m) | pdep(x, m̄)
+    shift = shift_safe(T, shift)
+    return pdep(x >> shift, m) | pdep(x, m̄)
 end
 
 function invgrpswap(x::AbstractVector, m::AbstractVector{Bool})
