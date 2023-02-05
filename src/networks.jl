@@ -1,7 +1,7 @@
 """
     PermutationNetwork{T}
 
-Abstract type for all bit permutation algorithms.
+Abstract type for all bit-permutation algorithms.
 """
 abstract type PermutationNetwork{T} end
 
@@ -252,8 +252,8 @@ for (Network, swap) in (BenesNetwork => deltaswap, GRPNetwork => grpswap)
 
         function bitpermute_elementwise!(x::AbstractArray{T}, net::$Network{T}) where {T}
             return foldl(net.params; init=x) do x, args
-                @inbounds @simd for i in eachindex(x)
-                    x[i] = $swap(x[i], args...)
+                @simd for i in eachindex(x)
+                    @inbounds x[i] = $swap(x[i], args...)
                 end
                 return x
             end
@@ -278,8 +278,8 @@ for (Network, invswap) in (BenesNetwork => deltaswap, GRPNetwork => invgrpswap)
 
         function invbitpermute_elementwise!(x::AbstractArray{T}, net::$Network{T}) where {T}
             return foldr(net.params; init=x) do args, x
-                @inbounds @simd for i in eachindex(x)
-                    x[i] = $invswap(x[i], args...)
+                @simd for i in eachindex(x)
+                    @inbounds x[i] = $invswap(x[i], args...)
                 end
                 return x
             end

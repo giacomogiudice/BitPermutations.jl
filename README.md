@@ -49,16 +49,16 @@ x = 0x08          # 0 0 0 1 0 0 0 0 (LSB -> MSB)
 
 bitpermute(x, p)  # 0 0 0 0 1 0 0 0, or 0x10
 
-p(x)              # idem
+p(x)              # Idem
 ```
 
 To inspect the result, we can use `bitstring`, or we can use a `Bits` (defined by the package).
-It is basically a faster `BitVector`, since its size is fixed (but is mutable).
+It is basically a faster `BitVector` (defined in `Base`), since its size is fixed (but is mutable).
 
 ```julia
-mb = Bits(x)
+bits = Bits(x)
 
-[mb[v], Bits(bitpermute(x, p))]
+[bits[v], Bits(bitpermute(x, p))]
 ```
 
 The neat thing of the underlying network is that the inverse permutation can be computed at the same cost.
@@ -67,85 +67,78 @@ This can be performed using `invbitpermute` or calling the adjoint permutation
 ```julia
 invbitpermute(x, p) === p'(x)
 
-[mb[invperm(v)], Bits(invbitpermute(x, p))]
+[bits[invperm(v)], Bits(invbitpermute(x, p))]
 ```
 
 Internally, a `Vector` of bit masks and shifts are stored and then applied sequentially at each call to `bitpermute`.
-If you need to apply the permutation to an array of data, use broacasting, as it is optimized to be faster than performing the permutations individually
+If you need to apply the permutation to an array of data, you can use the following syntax
 
 ```julia
 xs = rand(T, 10)
 
-p.(xs)    # Regular permutation element-wise
+p.(xs)                  # Regular permutation element-wise (also `bitpermute.(xs, p)`)
 
-p'.(xs)   # Inverse permutation element-wise
+bitpermute(xs, p)       # Idem
+
+bitpermute!(p, xs)      # Idem, but in-place
+
+p'.(xs)                 # Inverse permutation element-wise (also `invbitpermute.(xs, p)`)
+
+invbitpermute(xs, p)    # Idem
+
+invbitpermute!(xs, p)   # Idem, but in-place
 ```
+
+Internally, the broadcasted loop gets slices such that each stage is performed in parallel.
+This leads to a significant performance increase.
+As usual, if you do not need the original vector after the permutation step, the in-place version is faster, as it saves some allocations.
 
 ## Benchmarks
 
-As discussed later on, choosing types `UInt32` or `UInt64` can lead to significant speedups on processors which support BMI2 instructions.
-Here are some benchmarks on an Intel Haswell processor.
+The functionalities mentioned above are best summarized in the plot below.
+The results were obtained on an Intel Caskadelake processor running Julia 1.8.1 on a single thread.
+
+<p align="center">
+  <img src="./benchmark/results.svg" alt="Benchmark results" width=960/>
+</p>
+
+To accurately measure the repeatedly perform the same permutation `N` different times, similarly to
 
 ```julia
-using BitPermutations, Random, BenchmarkTools
-
-T = UInt64
-p = shuffle!(collect(1:bitsize(T)))
 x = rand(T)
 
-benes = BitPermutation{T}(p; type=BenesNetwork)
-
-grp = BitPermutation{T}(p; type=GRPNetwork)
+for _ in 1:N
+    x = bitpermute(x, p)
+end
 ```
 
-Notice that random permutations are typically the worst-case scenario, as the networks are usually the deepest.
-Nevertheless
-
-```
-julia> @btime bitpermute($x, $benes);
-  30.981 ns (0 allocations: 0 bytes)
-
-julia> @btime bitpermute($x, $grp);
-  10.872 ns (0 allocations: 0 bytes)
-```
-
-If you don't have hardware acceleration, the `GRPNetwork` permutation will still work but will be very slow.
-Let's now compare to naively permuting `Bits`s and `BitVector`s from `Base`.
-
+while the broadcasted permutation is performed on an array in an element-wise fashion
 ```julia
-mv = Bits(x)
-bv = BitVector(mv)
+xs = rand(T, N)
+
+bitpermute!(p, xs)
 ```
 
-They are around 5x (15x) and 10x (30x) slower compared to the `BenesNetwork` (`GRPNetwork`).
+In both cases we choose `N = 10_000`, and divide the median execution time by `N`.
+Considering single permutations, Beneš networks are consistently faster than doing naïve permutations of `BitVector`s by a factor of 10, approximately.
+As discussed later on, for types `UInt32` and `UInt64`, choosing a `GRPNetwork` can lead to significant speedups on processors which support BMI2 instructions.
+Indeed, this leads to a speedup of around 20-30 compared to `BitVector`s, since it exploits advanced processor intrinsincs at each stage.
+For other types however, the fallback implementation of these primitive operations is rather slow and should be avoided.
 
-```
-julia> @btime permute!($mv, $p);
-  166.468 ns (1 allocation: 576 bytes)
+This benchmark was performed for random permutations, and is somewhat of a worst-case scenario, since each of these network has typically the most number of stages.
+If your permutations are not completely random but have some structure, it is possible that you might achieve even larger speedups.
 
-julia> @btime permute!($bv, $p);
-  303.579 ns (1 allocation: 576 bytes) 
-```
+The most dramatic speedup are, however, for array-wise permutations.
+In this case a `BenesNetwork` can permute bitstrings in a couple nanoseconds, yielding speedups of more than two orders of magnitude (more than 120 and 150 for `UInt32` and `UInt64`, respectively).
+This is because the order of the operations is rearranged: the single layers of the network are not applied in sequence for each bit string, but are applied globally on each element.
+This allows the processor to do the same operation over and over again, and potentially even use AVX instructions (although the same speedups are observed on Apple silicon).
+It is unclear why the `GRPNetwork` is not faster than `BenesNetwork` for `UInt32` and `UInt64`  in this case, but I also do not know how to investigate this.
+For `UInt128`, the bitstrings exceed the processor word size, and everything is a bit slower.
+The speedup will also depend on the choice of `N`.
+Your mileage may vary, especially depending on whether or not the array fits in cache. 
 
-If your permutation is not random, it is likely to have even larger speedups as the networks will have fewer layers.
+The full benchmark routine can be found in `benchmark/benchmarks.jl`, while the script for plotting the results is `benchmark/plot.jl`.
 
-Broadcasted permutations are even faster than performing the permutations individually
-
-```julia
-xs = rand(T, 10_000)
-```
-
-This gives a further 2x speedup:
-
-```
-julia> @btime bitpermute.($xs, $benes);
-  86.915 μs (22 allocations: 859.89 KiB)
-
-julia> @btime bitpermute.($xs, $grp);
-  46.020 μs (10 allocations: 390.86 KiB)
-```
-
-Your mileage may very, as it is dependent on whether or not the array fits in cache.
 
 ## Details
 

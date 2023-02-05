@@ -7,9 +7,62 @@ abstract type AbstractBitPermutation{T} end
 
 (perm::AbstractBitPermutation)(x) = bitpermute(x, perm)
 
+"""
+    bitpermute(x::Number, p::AbstractBitPermutation)
+    bitpermute(x::Number, net::PermutationNetwork)
+    bitpermute(x::AbstractArray{T}, p::AbstractBitPermutation{T})
+
+Perform a permutation the bits in `x` using an `AbstractBitPermutation`, using the permutation
+specified in `p`.
+The syntax `p(x)` can be used as well.
+Internally, the permutation operations are stored as a `PermutationNetwork`, so the permutation can
+be called using the network directly.
+If the input is an `AbstractArray` subtype, the permutation is performed element-wise.
+This can be called as well with `p.(x)` or `bitpermute.(x, p)`.
+For cases in which the input array is not needed afterwards, the in-place version `bitpermute!` is
+preferred.
+
+See also [`invbitpermute`](@ref), [`bitpermute!`](@ref).
+"""
 bitpermute(x::AbstractArray{T}, P::AbstractBitPermutation{T}) where {T} = bitpermute_elementwise(x, P)
-invpermute(x::AbstractArray{T}, P::AbstractBitPermutation{T}) where {T} = invbitpermute_elementwise(x, P)
+
+"""
+    bitpermute!(x::AbstractArray{T}, P::AbstractBitPermutation{T})
+
+Perform the  permutation of the bits in each element of `x` using an `AbstractBitPermutation` in
+place, i.e. by mutating the array `x`.
+
+See also [`bitpermute`](@ref).
+"""
 bitpermute!(x::AbstractArray{T}, P::AbstractBitPermutation{T}) where {T} = bitpermute_elementwise!(x, P)
+
+"""
+    invbitpermute(x::Number, p::AbstractBitPermutation)
+    invbitpermute(x::Number, net::PermutationNetwork)
+    invbitpermute(x::AbstractArray{T}, P::AbstractBitPermutation{T})
+
+Perform the inverse permutation of the bits in `x` using an `AbstractBitPermutation`, using the
+inverse of the permutation specified in `p`.
+The syntax `p'(x)` can be used as well.
+Internally, the permutation operations are stored as a `PermutationNetwork`, so the permutation can
+be called using the network directly.
+If the input is an `AbstractArray` subtype, the inverse permutation is performed element-wise.
+This can be called as well with `p'.(x)` or `invbitpermute.(x, p)`.
+For cases in which the input array is not needed afterwards, the in-place version `invbitpermute!`
+is preferred.
+
+See also [`bitpermute`](@ref), [`invbitpermute!`](@ref).
+"""
+invbitpermute(x::AbstractArray{T}, P::AbstractBitPermutation{T}) where {T} = invbitpermute_elementwise(x, P)
+
+"""
+    invbitpermute!(x::AbstractArray{T}, P::AbstractBitPermutation{T})
+
+Perform the inverse permutation of the bits in each element of `x` using an
+`AbstractBitPermutation` in place, i.e. by mutating the array `x`.
+
+See also [`invbitpermute`](@ref).
+"""
 invbitpermute!(x::AbstractArray{T}, P::AbstractBitPermutation{T}) where {T} = invbitpermute_elementwise!(x, P)
 
 Base.broadcasted(P::AbstractBitPermutation{T}, x::AbstractArray{T}) where {T} = bitpermute_elementwise(x, P)
@@ -68,26 +121,7 @@ function Base.show(io::IO, ::MIME"text/plain", P::BitPermutation{T}) where {T}
     return nothing
 end
 
-"""
-    bitpermute(x, p::AbstractBitPermutation)
-    bitpermute(x, n::PermutationNetwork)
-
-Permute bits in `x` using a an `AbstractBitPermutation` or a `PermutationNetwork`.
-Callable as well as `p(x)`.
-
-See also [`invbitpermute`](@ref).
-"""
 bitpermute(x::Number, P::BitPermutation{T}) where {T} = bitpermute(convert(T, x), P.network)
-
-"""
-    invbitpermute(x, p::AbstractBitPermutation)
-    invbitpermute(x, n::PermutationNetwork)
-
-Permute bits in `x` using a an `AbstractBitPermutation` or a `PermutationNetwork`.
-Callable as well as `p'(x)`.
-
-See also [`bitpermute`](@ref).
-"""
 invbitpermute(x::Number, P::BitPermutation{T}) where {T} = invbitpermute(convert(T, x), P.network)
 
 bitpermute_elementwise(x::AbstractArray, P::BitPermutation) = bitpermute_elementwise(x, P.network)
