@@ -1,11 +1,15 @@
 """
-    bitsize(T::Unsigned)
+    bitsize(::Type{T})
     bitsize(obj::T)
 
-Number of bits in the binary representations of `T`.
+Number of bits in the binary representations of any primitive type `T`.
 """
-bitsize(::Type{T}) where {T<:Unsigned} = 8 * sizeof(T)
-bitsize(::T) where {T<:Unsigned} = bitsize(T)
+function bitsize(x::Type{T}) where {T}
+    isprimitivetype(x) || throw(ArgumentError("Argument of `bitsize` must be a primitive type"))
+    return 8 * sizeof(x)
+end
+
+bitsize(x::T) where {T} = bitsize(T)
 
 """
     shift_safe(::Type{T}, s::Integer)

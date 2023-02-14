@@ -1,7 +1,7 @@
 """
     Bits{T} <: AbstractArray{Bool,1}
 
-A mutable, statically-sized bit vector encoded in the bits in an element of type `T <: Unsigned`.
+A mutable, statically-sized bit vector encoded in the bits in an element of type `T <: Integer`.
 
 A `Bits` should behave similarly to a `BitVector`, but it is slightly faster as the size is known
 at compile-time to be `bitsize(T)`.
@@ -10,10 +10,10 @@ mutable struct Bits{T} <: AbstractArray{Bool,1}
     chunk::T
 
     # Constructor for Integers
-    Bits{T}(input::T) where {T<:Unsigned} = new{T}(input)
+    Bits{T}(input::Integer) where {T<:Integer} = new{T}(convert(T, input))
 
     # Constructor for iterable inputs
-    function Bits{T}(input) where {T<:Unsigned}
+    function Bits{T}(input) where {T<:Integer}
         # Iterate over input
         val = zero(T)
         mask = one(T)
@@ -30,10 +30,12 @@ mutable struct Bits{T} <: AbstractArray{Bool,1}
 end
 
 """
-    Bits(input::T)
-    Bits{T}(input::T)
+    Bits(input::Integer)
+    Bits{T}(input::Integer)
+    Bits{T}(input)
 
-Construct a `Bits` from the bits in `input`.
+Construct a `Bits` from the bits in `input`, passed either as a `Integer` or from an array, or any
+other generic iterable.
 It is basically a view into the bits of `input`, which can then be manipulated using vector-like
 syntax.
 """
