@@ -5,6 +5,32 @@ Abstract type for all bit-permutation algorithms.
 """
 abstract type PermutationNetwork{T} end
 
+# Fallback implementation for arrays
+function bitpermute_elementwise(x::AbstractArray{T}, net::PermutationNetwork{T}) where {T}
+    return _fallback_bitpermute_elementwise!(similar(x), x, net, bitpermute)
+end
+
+function bitpermute_elementwise!(x::AbstractArray{T}, net::PermutationNetwork{T}) where {T}
+    return _fallback_bitpermute_elementwise!(x, x, net, bitpermute)
+end
+
+function invbitpermute_elementwise(x::AbstractArray{T}, net::PermutationNetwork{T}) where {T}
+    return _fallback_bitpermute_elementwise!(similar(x), x, net, invbitpermute)
+end
+
+function invbitpermute_elementwise!(x::AbstractArray{T}, net::PermutationNetwork{T}) where {T}
+    return _fallback_bitpermute_elementwise!(x, x, net, bitpermute)
+end
+
+@inline function _fallback_bitpermute_elementwise!(
+    y::AbstractArray{T}, x::AbstractArray{T}, net::PermutationNetwork{T}, op::Function
+) where {T}
+    @simd for i in eachindex(x)
+        @inbounds y[i] = op(x[i], net)
+    end
+    return y
+end
+
 """
     BenesNetwork{T}
 
@@ -285,4 +311,36 @@ for (Network, invswap) in (BenesNetwork => deltaswap, GRPNetwork => invgrpswap)
             end
         end
     end
+end
+
+struct AVXCopyGather{T,W} <: PermutationNetwork{T}
+    m::Vec{W,UInt8}
+    m̄::Vec{W,UInt8}
+end
+
+function AVXCopyGather{T}(perm::AbstractVector{Int}) where {T<:Union{UInt16,UInt32,UInt64}}
+    n = length(perm)
+    W = bitsize(T)
+    n ≤ bitsize(T) || throw(OverflowError("Permutation is too long for Type $T"))
+    isperm(perm) || throw(ArgumentError("Input vector is not a permutation"))
+
+    # Pad permutation vector
+    perm = [collect(perm); (n + 1):bitsize(T)]
+
+    # Convert permutation to mask
+    m = Vec{W,UInt8}(ntuple(i -> UInt8(perm[i] - 1), W))
+    m̄ = Vec{W,UInt8}(ntuple(i -> UInt8(findfirst(==(i), perm) - 1), W))
+    return AVXCopyGather{T,W}(m, m̄)
+end
+
+Base.show(io::IO, net::AVXCopyGather{T}) where {T} = print(io, "AVXCopyGather{$T}($(net.m), $(net.m̄))")
+
+function bitpermute(x::T, net::AVXCopyGather{T}) where {T}
+    (; m) = net
+    return _avx_bit_shuffle(x, m)
+end
+
+function invbitpermute(x::T, net::AVXCopyGather{T}) where {T}
+    (; m̄) = net
+    return _avx_bit_shuffle(x, m̄)
 end

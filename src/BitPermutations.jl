@@ -1,10 +1,11 @@
 module BitPermutations
 
 using Combinatorics
+using SIMD
 using Base: Broadcast
 
 export Bits
-export PermutationNetwork, BenesNetwork, GRPNetwork
+export PermutationNetwork, BenesNetwork, GRPNetwork, AVXCopyGather
 export AbstractBitPermutation, BitPermutation, AdjointBitPermutation
 
 export bitsize

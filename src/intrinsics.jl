@@ -1,3 +1,5 @@
+using Base: llvmcall
+
 """
     has_bmi2()
 
@@ -74,4 +76,38 @@ function _pext_fallback(x::T, mask::T) where {T}
         bb += bb
     end
     return r
+end
+
+"""
+Dictionary for the lookup of the LLVM type for a Julia type.
+"""
+const LLVM_TYPES = Dict(UInt8 => "i8", UInt16 => "i16", UInt32 => "i32", UInt64 => "i64")
+
+"""
+    _avx_bit_shuffle(x::T, m::Vec{W,UInt8})
+
+Perform a bit-shuffle using AVX instructions.
+"""
+@generated function _avx_bit_shuffle(x::T, m::Vec{W,UInt8}) where {T<:Unsigned,W}
+    @assert W == 8 * sizeof(T)
+    N = 8 * W
+    R = LLVM_TYPES[T]
+    # Use `vpshufbitqmb` intrisic to perform the permutation
+    decl = """
+        define $R @bit_shuffle(<$W x i8> %a, <$W x i8> %b) {
+            %mask = call <$W x i1> @llvm.x86.avx512.vpshufbitqmb.$N(<$W x i8> %a, <$W x i8> %b)
+            %res = bitcast <$W x i1> %mask to $R
+            ret $R %res
+       }
+
+       declare <$W x i1> @llvm.x86.avx512.vpshufbitqmb.$N(<$W x i8>, <$W x i8>)
+    """
+    instr = "bit_shuffle"
+
+    return quote
+        # Copy value of `x` 8 times to fill SIMD register, reinterpret it to match LLVM definition
+        rep = reinterpret(Vec{$W,UInt8}, Vec{8,$T}(x))
+        # Call intrinsic via LLVM API
+        llvmcall(($decl, $instr), $T, Tuple{Vec{$W,UInt8},Vec{$W,UInt8}}, rep, m)
+    end
 end
