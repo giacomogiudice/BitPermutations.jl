@@ -53,7 +53,7 @@ jobs:
       - name: Setup Julia
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.8'
+          version: '1.9'
 
       - name: Run JuliaFormatter
         run: |
