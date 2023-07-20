@@ -7,23 +7,23 @@ abstract type PermutationNetwork{T} end
 
 # Fallback implementation for arrays
 function bitpermute_elementwise(x::AbstractArray{T}, net::PermutationNetwork{T}) where {T}
-    return _fallback_bitpermute_elementwise!(similar(x), x, net, bitpermute)
+    return _fallback_bitpermute_elementwise!(bitpermute, similar(x), x, net)
 end
 
 function bitpermute_elementwise!(x::AbstractArray{T}, net::PermutationNetwork{T}) where {T}
-    return _fallback_bitpermute_elementwise!(x, x, net, bitpermute)
+    return _fallback_bitpermute_elementwise!(bitpermute, x, x, net)
 end
 
 function invbitpermute_elementwise(x::AbstractArray{T}, net::PermutationNetwork{T}) where {T}
-    return _fallback_bitpermute_elementwise!(similar(x), x, net, invbitpermute)
+    return _fallback_bitpermute_elementwise!(invbitpermute, similar(x), x, net)
 end
 
 function invbitpermute_elementwise!(x::AbstractArray{T}, net::PermutationNetwork{T}) where {T}
-    return _fallback_bitpermute_elementwise!(x, x, net, bitpermute)
+    return _fallback_bitpermute_elementwise!(invbitpermute, x, x, net)
 end
 
 @inline function _fallback_bitpermute_elementwise!(
-    y::AbstractArray{T}, x::AbstractArray{T}, net::PermutationNetwork{T}, op::Function
+    op::Function, y::AbstractArray{T}, x::AbstractArray{T}, net::PermutationNetwork{T}
 ) where {T}
     @simd for i in eachindex(x)
         @inbounds y[i] = op(x[i], net)
@@ -313,6 +313,15 @@ for (Network, invswap) in (BenesNetwork => deltaswap, GRPNetwork => invgrpswap)
     end
 end
 
+"""
+    AVXCopyGather{T}
+
+A permutation method which uses AVX-512 intrisics to perform a permutation on 16-, 32-, or 64-bit
+long integers.
+The input data is copied several times to fill an AVX register, and then a special operation
+extracts data from it using a mask.
+Internally, it stores precomputed masks for the forward and backward permutation.
+"""
 struct AVXCopyGather{T,W} <: PermutationNetwork{T}
     m::Vec{W,UInt8}
     m̄::Vec{W,UInt8}
@@ -337,10 +346,10 @@ Base.show(io::IO, net::AVXCopyGather{T}) where {T} = print(io, "AVXCopyGather{$T
 
 function bitpermute(x::T, net::AVXCopyGather{T}) where {T}
     (; m) = net
-    return _avx_bit_shuffle(x, m)
+    return avx_bit_shuffle(x, m)
 end
 
 function invbitpermute(x::T, net::AVXCopyGather{T}) where {T}
     (; m̄) = net
-    return _avx_bit_shuffle(x, m̄)
+    return avx_bit_shuffle(x, m̄)
 end

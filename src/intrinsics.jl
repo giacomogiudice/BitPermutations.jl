@@ -1,19 +1,5 @@
+using Base.BinaryPlatforms: CPUID
 using Base: llvmcall
-
-"""
-    has_bmi2()
-
-Tests if the processor supports hardware BMI2 instructions.
-"""
-function has_bmi2()
-    Sys.ARCH ≡ :x86_64 || return false
-
-    # Explanation:
-    # https://stackoverflow.com/questions/32214843/compiler-macro-to-detect-bmi2-instruction-set
-    CPUInfo = zeros(Int32, 4)
-    ccall(:jl_cpuidex, Cvoid, (Ptr{Cint}, Cint, Cint), CPUInfo, 7, 0)
-    return !iszero(CPUInfo[2] & 0x100)
-end
 
 """
     use_bmi2()
@@ -21,11 +7,30 @@ end
 Used to set `USE_BMI2` flag at precompilation.
 """
 function use_bmi2()
-    flag = get(ENV, "BP_USE_BMI2", true)
-    return (flag isa Bool ? flag : parse(Bool, flag)) && has_bmi2()
+    if haskey(ENV, "BIT_PERMUTATIONS_USE_INTRINSICS")
+        flag = ENV["BIT_PERMUTATIONS_USE_INTRINSICS"]
+        flag isa Bool || (flag = parse(Bool, flag))
+        return flag
+    end
+    return CPUID.test_cpu_feature(CPUID.JL_X86_bmi2)
+end
+
+"""
+    use_avx512()
+
+Used to set `USE_AVX512` flag at precompilation.
+"""
+function use_avx512()
+    if haskey(ENV, "BIT_PERMUTATIONS_USE_INTRINSICS")
+        flag = ENV["BIT_PERMUTATIONS_USE_INTRINSICS"]
+        flag isa Bool || (flag = parse(Bool, flag))
+        return flag
+    end
+    return CPUID.test_cpu_feature(CPUID.JL_X86_avx512bitalg)
 end
 
 const USE_BMI2 = use_bmi2()
+const USE_AVX512 = use_avx512()
 
 """
     pdep(x::T, m::T)
@@ -78,21 +83,21 @@ function _pext_fallback(x::T, mask::T) where {T}
     return r
 end
 
-"""
-Dictionary for the lookup of the LLVM type for a Julia type.
-"""
 const LLVM_TYPES = Dict(UInt8 => "i8", UInt16 => "i16", UInt32 => "i32", UInt64 => "i64")
 
 """
-    _avx_bit_shuffle(x::T, m::Vec{W,UInt8})
+    avx_bit_shuffle(x::T, mask::Vec{W,UInt8})
 
-Perform a bit-shuffle using AVX instructions.
+Perform a bit-shuffle of the bits in `x` using AVX instructions.
+The mask `mask` stores the zero-based indices of the locations of each bit in the permuted vector.
 """
-@generated function _avx_bit_shuffle(x::T, m::Vec{W,UInt8}) where {T<:Unsigned,W}
+@generated function avx_bit_shuffle(x::T, mask::Vec{W,UInt8}) where {T<:Unsigned,W}
+    @assert USE_AVX512 || error("AVX512 instructions are not supported on this processor.")
     @assert W == 8 * sizeof(T)
     N = 8 * W
     R = LLVM_TYPES[T]
-    # Use `vpshufbitqmb` intrisic to perform the permutation
+    # Use `vpshufbitqmb` intrisic to perform the permutation, adapted from 
+    # https://lemire.me/blog/2023/06/29/dynamic-bit-shuffle-using-avx-512/
     decl = """
         define $R @bit_shuffle(<$W x i8> %a, <$W x i8> %b) {
             %mask = call <$W x i1> @llvm.x86.avx512.vpshufbitqmb.$N(<$W x i8> %a, <$W x i8> %b)
@@ -108,6 +113,6 @@ Perform a bit-shuffle using AVX instructions.
         # Copy value of `x` 8 times to fill SIMD register, reinterpret it to match LLVM definition
         rep = reinterpret(Vec{$W,UInt8}, Vec{8,$T}(x))
         # Call intrinsic via LLVM API
-        llvmcall(($decl, $instr), $T, Tuple{Vec{$W,UInt8},Vec{$W,UInt8}}, rep, m)
+        llvmcall(($decl, $instr), $T, Tuple{Vec{$W,UInt8},Vec{$W,UInt8}}, rep, mask)
     end
 end
