@@ -105,7 +105,12 @@ function BitPermutation{T}(p::AbstractVector{Int}; type::Type=_default_type(T), 
     return BitPermutation{T}(perm, net)
 end
 
-_default_type(::Type{T}) where {T<:Union{UInt32,UInt64}} = ifelse(USE_BMI2, GRPNetwork, BenesNetwork)
+_default_type(::Type{T}) where {T<:UInt16} = ifelse(USE_AVX512, AVXCopyGather, BenesNetwork)
+
+function _default_type(::Type{T}) where {T<:Union{UInt32,UInt64}}
+    return ifelse(USE_AVX512, AVXCopyGather, ifelse(USE_BMI2, GRPNetwork, BenesNetwork))
+end
+
 _default_type(_::Type{T}) where {T} = BenesNetwork
 
 Base.show(io::IO, ::BitPermutation{T}) where {T} = print(io, "BitPermutation{$T}")
