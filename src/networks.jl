@@ -344,12 +344,6 @@ end
 
 Base.show(io::IO, net::AVXCopyGather{T}) where {T} = print(io, "AVXCopyGather{$T}($(net.m), $(net.m̄))")
 
-function bitpermute(x::T, net::AVXCopyGather{T}) where {T}
-    (; m) = net
-    return avx_bit_shuffle(x, m)
-end
+bitpermute(x::T, net::AVXCopyGather{T}) where {T} = avx_bit_shuffle(x, net.m)
 
-function invbitpermute(x::T, net::AVXCopyGather{T}) where {T}
-    (; m̄) = net
-    return avx_bit_shuffle(x, m̄)
-end
+invbitpermute(x::T, net::AVXCopyGather{T}) where {T} = avx_bit_shuffle(x, net.m̄)
