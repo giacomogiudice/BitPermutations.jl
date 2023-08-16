@@ -220,4 +220,4 @@ Here I just list the first ones off the top of my head:
 
 ## Compatibility
 
-This package is compatible with Julia 1.5 and above.
+This package is compatible with Julia 1.6 and above.

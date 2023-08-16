@@ -15,8 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        julia-version: ['1.5','1.6','1.9','nightly'] # earliest, lts, stable, nightly
-        julia-arch: [x64, x86]
+        julia-version: ['1.6','1.9','nightly'] # lts, stable, nightly
+        julia-arch: ['x64', 'x86']
     steps:
       - name: Checkout
         uses: actions/checkout@v3
