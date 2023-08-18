@@ -2,7 +2,6 @@ module BitPermutations
 
 using Combinatorics
 using SIMD
-using Base: Broadcast
 
 export Bits
 export PermutationNetwork, BenesNetwork, GRPNetwork, AVXCopyGather
@@ -12,7 +11,6 @@ export bitsize
 export bitpermute, invbitpermute, bitpermute!, invbitpermute!
 export cycles, order
 
-include("intrinsics.jl")
 include("primitives.jl")
 include("bitarrays.jl")
 include("networks.jl")
