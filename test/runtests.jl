@@ -175,6 +175,7 @@ end
 
         # Test conversion to `Vector`
         @test Vector(P) == p₀
+        @test Vector(P') == invperm(p₀)
 
         # Test random permutations
         for _ in 1:10

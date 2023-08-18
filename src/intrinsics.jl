@@ -1,17 +1,15 @@
 using Base.BinaryPlatforms: CPUID
 using Base: llvmcall
 
+const ENV_KEY = "BIT_PERMUTATIONS_USE_INTRINSICS"
+
 """
     use_bmi2()
 
 Used to set `USE_BMI2` flag at precompilation.
 """
 function use_bmi2()
-    if haskey(ENV, "BIT_PERMUTATIONS_USE_INTRINSICS")
-        flag = ENV["BIT_PERMUTATIONS_USE_INTRINSICS"]
-        flag isa Bool || (flag = parse(Bool, flag))
-        return flag
-    end
+    haskey(ENV, ENV_KEY) && return parse(Bool, ENV[ENV_KEY])
     return Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_bmi2)
 end
 
@@ -21,11 +19,7 @@ end
 Used to set `USE_AVX512` flag at precompilation.
 """
 function use_avx512()
-    if haskey(ENV, "BIT_PERMUTATIONS_USE_INTRINSICS")
-        flag = ENV["BIT_PERMUTATIONS_USE_INTRINSICS"]
-        flag isa Bool || (flag = parse(Bool, flag))
-        return flag
-    end
+    haskey(ENV, ENV_KEY) && return parse(Bool, ENV[ENV_KEY])
     return Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_avx512bitalg)
 end
 
@@ -128,7 +122,6 @@ end
 function _avx_bit_shuffle_fallback(x::T, mask::Vec{W,UInt8}) where {T<:Unsigned,W}
     # `W` is the number of bits in `T`
     @assert W == 8 * sizeof(T)
-
     u = one(T)
     out = zero(T)
     @inbounds for i in 1:W
