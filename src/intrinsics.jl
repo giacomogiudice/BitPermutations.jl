@@ -83,16 +83,23 @@ function _pext_fallback(x::T, mask::T) where {T}
     return r
 end
 
-const LLVM_TYPES = Dict(UInt8 => "i8", UInt16 => "i16", UInt32 => "i32", UInt64 => "i64")
-
 """
     avx_bit_shuffle(x::T, mask::Vec{W,UInt8})
 
 Perform a bit-shuffle of the bits in `x` using AVX instructions.
 The mask `mask` stores the zero-based indices of the locations of each bit in the permuted vector.
 """
-@generated function avx_bit_shuffle(x::T, mask::Vec{W,UInt8}) where {T<:Unsigned,W}
+function avx_bit_shuffle(x::T, m::Vec{W,UInt8}) where {T<:Union{UInt16,UInt32,UInt64},W}
+    return USE_AVX512 ? _avx_bit_shuffle(x, m) : _avx_bit_shuffle_fallback(x, m)
+end
+
+avx_bit_shuffle(x::T, m::Vec{W,UInt8}) where {T<:Unsigned,W} = _avx_bit_shuffle_fallback(x, m)
+
+const LLVM_TYPES = Dict(UInt8 => "i8", UInt16 => "i16", UInt32 => "i32", UInt64 => "i64")
+
+@generated function _avx_bit_shuffle(x::T, mask::Vec{W,UInt8}) where {T<:Union{UInt16,UInt32,UInt64},W}
     @assert USE_AVX512 || error("AVX512 instructions are not supported on this processor.")
+    # `W` is the size of the each block, `N` is the total number of bits
     @assert W == 8 * sizeof(T)
     N = 8 * W
     R = LLVM_TYPES[T]
@@ -115,4 +122,18 @@ The mask `mask` stores the zero-based indices of the locations of each bit in th
         # Call intrinsic via LLVM API
         llvmcall(($decl, $instr), $T, Tuple{Vec{$W,UInt8},Vec{$W,UInt8}}, rep, mask)
     end
+end
+
+# Fallback: perform slow permutation by checking the bit at each mask location and setting it on the output
+function _avx_bit_shuffle_fallback(x::T, mask::Vec{W,UInt8}) where {T<:Unsigned,W}
+    # `W` is the number of bits in `T`
+    @assert W == 8 * sizeof(T)
+
+    u = one(T)
+    out = zero(T)
+    @inbounds for i in 1:W
+        bit = !iszero(x & u << mask[i])
+        out |= T(bit) << (i - 1)
+    end
+    return out
 end

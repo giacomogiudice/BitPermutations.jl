@@ -20,7 +20,6 @@ USE_AVX512 = $(USE_AVX512)
 
 # Test types from Base
 base_types = (UInt8, UInt16, UInt32, UInt64, UInt128)
-avx_types = USE_AVX512 ? (UInt16, UInt32, UInt64) : ()
 
 # Types defined in BitIntegers
 custom_types = (UInt256, UInt512, UInt1024)
@@ -137,7 +136,7 @@ end
     end
 end
 
-@testset "AVXCopyGather{$T}" for T in avx_types
+@testset "AVXCopyGather{$T}" for T in base_types
     for _ in 1:10
         n = rand(1:bitsize(T))
         p = randperm(n)
@@ -155,8 +154,7 @@ end
 @testset "BitPermutation{$T}" for T in base_types
     p₀ = [2, 6, 5, 8, 4, 7, 1, 3]
 
-    backends = [BenesNetwork, GRPNetwork]
-    T ∈ avx_types && push!(backends, AVXCopyGather)
+    backends = [BenesNetwork, GRPNetwork, AVXCopyGather]
 
     @testset "$backend_type" for backend_type in backends
         P = BitPermutation{T}(p₀; type=backend_type)

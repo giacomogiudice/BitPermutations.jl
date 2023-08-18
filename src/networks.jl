@@ -327,11 +327,12 @@ struct AVXCopyGather{T,W} <: PermutationNetwork{T}
     m̄::Vec{W,UInt8}
 end
 
-function AVXCopyGather{T}(perm::AbstractVector{Int}) where {T<:Union{UInt16,UInt32,UInt64}}
+function AVXCopyGather{T}(perm::AbstractVector{Int}) where {T}
     n = length(perm)
     W = bitsize(T)
     n ≤ bitsize(T) || throw(OverflowError("Permutation is too long for Type $T"))
     isperm(perm) || throw(ArgumentError("Input vector is not a permutation"))
+    USE_AVX512 || @warn "Not using AVX-512 instructions, performance may be limited" maxlog = 1
 
     # Pad permutation vector
     perm = [collect(perm); (n + 1):bitsize(T)]
