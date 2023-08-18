@@ -9,14 +9,14 @@ abstract type AbstractBitPermutation{T} end
 
 """
     bitpermute(x::Number, p::AbstractBitPermutation)
-    bitpermute(x::Number, net::PermutationNetwork)
+    bitpermute(x::Number, backend::PermutationBackend)
     bitpermute(x::AbstractArray{T}, p::AbstractBitPermutation{T})
 
 Perform a permutation the bits in `x` using an `AbstractBitPermutation`, using the permutation
 specified in `p`.
 The syntax `p(x)` can be used as well.
-Internally, the permutation operations are stored as a `PermutationNetwork`, so the permutation can
-be called using the network directly.
+Internally, the permutation operations are stored as a `PermutationBackend`, so the permutation can
+be called using the backend directly.
 If the input is an `AbstractArray` subtype, the permutation is performed element-wise.
 This can be called as well with `p.(x)` or `bitpermute.(x, p)`.
 For cases in which the input array is not needed afterwards, the in-place version `bitpermute!` is
@@ -38,14 +38,14 @@ bitpermute!(x::AbstractArray{T}, P::AbstractBitPermutation{T}) where {T} = bitpe
 
 """
     invbitpermute(x::Number, p::AbstractBitPermutation)
-    invbitpermute(x::Number, net::PermutationNetwork)
+    invbitpermute(x::Number, backend::PermutationBackend)
     invbitpermute(x::AbstractArray{T}, P::AbstractBitPermutation{T})
 
 Perform the inverse permutation of the bits in `x` using an `AbstractBitPermutation`, using the
 inverse of the permutation specified in `p`.
 The syntax `p'(x)` can be used as well.
-Internally, the permutation operations are stored as a `PermutationNetwork`, so the permutation can
-be called using the network directly.
+Internally, the permutation operations are stored as a `PermutationBackend`, so the permutation can
+be called using the backend directly.
 If the input is an `AbstractArray` subtype, the inverse permutation is performed element-wise.
 This can be called as well with `p'.(x)` or `invbitpermute.(x, p)`.
 For cases in which the input array is not needed afterwards, the in-place version `invbitpermute!`
@@ -78,45 +78,49 @@ end
 """
     BitPermutation{T,A}
 
-Represents a bit permutation of type `T`, performed with a `PermutationNetwork` of type `A`.
+Represents a bit permutation of type `T`, performed with a `PermutationBackend` of type `A`.
 """
-struct BitPermutation{T,P<:PermutationNetwork{T}} <: AbstractBitPermutation{T}
+struct BitPermutation{T,B<:PermutationBackend{T}} <: AbstractBitPermutation{T}
     vector::Vector{Int}
-    network::P
+    backend::B
 
-    function BitPermutation{T}(perm::Vector{Int}, net::P) where {T,P<:PermutationNetwork{T}}
-        return new{T,P}(perm, net)
+    function BitPermutation{T}(perm::Vector{Int}, backend::B) where {T,B<:PermutationBackend{T}}
+        return new{T,B}(perm, backend)
     end
 end
 
 """
-    BitPermutation{T}(p::AbstractVector{Int}; type=[DEFAULT_TYPE], [...])
+    BitPermutation{T}(p::AbstractVector{Int}; backend=[DEFAULT_TYPE], [...])
 
 Construct a `BitPermutation{T}` from permutation vector `p`.
-The type of algorithm can be specified by the `type` keyword argument.
-If none is provided, `BenesNetwork` is chosen, unless `T<:Union{UInt32,UInt64}` and
-BMI2 instructions are supported by the processor, in which case a `GRPNetwork` is chosen.
+The backend that actually performs the permutation can be specified by the `backend` keyword argument.
+The `backend` defaults to the following:
+    - if AVX-512 instrinsics are available, an `AVXCopyGather` is chosen for `T<:Union{UInt16,UInt32,UInt64}`;
+    - if BMI2 instrinsics are available, a `GRPNetwork` is chose for `T<:Union{UInt32,UInt64}`;
+    - In all other cases, `BenesNetwork` is used.
+
+Extra keyword arguments get passed to the backend.
 
 See also: [`BenesNetwork`](@ref), [`GRPNetwork`](@ref).
 """
-function BitPermutation{T}(p::AbstractVector{Int}; type::Type=_default_type(T), kwargs...) where {T}
+function BitPermutation{T}(p::AbstractVector{Int}; backend::Type=_default_backend(T), kwargs...) where {T}
     perm = collect(p)
-    net = (type){T}(perm; kwargs...)
-    return BitPermutation{T}(perm, net)
+    backend = (backend){T}(perm; kwargs...)
+    return BitPermutation{T}(perm, backend)
 end
 
-_default_type(::Type{T}) where {T<:UInt16} = ifelse(USE_AVX512, AVXCopyGather, BenesNetwork)
+_default_backend(::Type{T}) where {T<:UInt16} = ifelse(USE_AVX512, AVXCopyGather, BenesNetwork)
 
-function _default_type(::Type{T}) where {T<:Union{UInt32,UInt64}}
+function _default_backend(::Type{T}) where {T<:Union{UInt32,UInt64}}
     return ifelse(USE_AVX512, AVXCopyGather, ifelse(USE_BMI2, GRPNetwork, BenesNetwork))
 end
 
-_default_type(_::Type{T}) where {T} = BenesNetwork
+_default_backend(_::Type{T}) where {T} = BenesNetwork
 
 Base.show(io::IO, ::BitPermutation{T}) where {T} = print(io, "BitPermutation{$T}")
 
 function Base.show(io::IO, ::MIME"text/plain", P::BitPermutation{T}) where {T}
-    println(io, "BitPermutation{$T} with network $(P.network):")
+    println(io, "BitPermutation{$T} with backend $(P.backend):")
     foreach(cycles(P)) do cycle
         length(cycle) === 1 && return nothing
         print(io, "(")
@@ -126,13 +130,13 @@ function Base.show(io::IO, ::MIME"text/plain", P::BitPermutation{T}) where {T}
     return nothing
 end
 
-bitpermute(x::Number, P::BitPermutation{T}) where {T} = bitpermute(convert(T, x), P.network)
-invbitpermute(x::Number, P::BitPermutation{T}) where {T} = invbitpermute(convert(T, x), P.network)
+bitpermute(x::Number, P::BitPermutation{T}) where {T} = bitpermute(convert(T, x), P.backend)
+invbitpermute(x::Number, P::BitPermutation{T}) where {T} = invbitpermute(convert(T, x), P.backend)
 
-bitpermute_elementwise(x::AbstractArray, P::BitPermutation) = bitpermute_elementwise(x, P.network)
-invbitpermute_elementwise(x::AbstractArray, P::BitPermutation) = invbitpermute_elementwise(x, P.network)
-bitpermute_elementwise!(x::AbstractArray, P::BitPermutation) = bitpermute_elementwise!(x, P.network)
-invbitpermute_elementwise!(x::AbstractArray, P::BitPermutation) = invbitpermute_elementwise!(x, P.network)
+bitpermute_elementwise(x::AbstractArray, P::BitPermutation) = bitpermute_elementwise(x, P.backend)
+invbitpermute_elementwise(x::AbstractArray, P::BitPermutation) = invbitpermute_elementwise(x, P.backend)
+bitpermute_elementwise!(x::AbstractArray, P::BitPermutation) = bitpermute_elementwise!(x, P.backend)
+invbitpermute_elementwise!(x::AbstractArray, P::BitPermutation) = invbitpermute_elementwise!(x, P.backend)
 
 Base.Vector(P::BitPermutation) = P.vector
 
@@ -226,10 +230,10 @@ Returns a `Bool` corresponding to whether or not the parity of the permutation i
 See also [`iseven`](@ref).
 """
 function Base.isodd(P::BitPermutation{T,BenesNetwork{T}}) where {T}
-    return isodd(count_ones(mapreduce(first, ⊻, P.network.params; init=zero(T))))
+    return isodd(count_ones(mapreduce(first, ⊻, P.backend.params; init=zero(T))))
 end
 function Base.isodd(P::BitPermutation{T,GRPNetwork{T}}) where {T}
-    return isodd(count_ones(mapreduce(first, ⊻, P.network.params; init=zero(T))))
+    return isodd(count_ones(mapreduce(first, ⊻, P.backend.params; init=zero(T))))
 end
 Base.isodd(P::AdjointBitPermutation) = isodd(P.parent)
 Base.isodd(P::AbstractBitPermutation) = mapreduce(isodd ∘ length, ⊻, cycles(P); init=false)

@@ -4,7 +4,7 @@ using Combinatorics
 using SIMD
 
 export Bits
-export PermutationNetwork, BenesNetwork, GRPNetwork, AVXCopyGather
+export PermutationBackend, BenesNetwork, GRPNetwork, AVXCopyGather
 export AbstractBitPermutation, BitPermutation, AdjointBitPermutation
 
 export bitsize
@@ -13,7 +13,7 @@ export cycles, order
 
 include("primitives.jl")
 include("bitarrays.jl")
-include("networks.jl")
+include("backends.jl")
 include("permutations.jl")
 
 end # module

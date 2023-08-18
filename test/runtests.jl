@@ -112,11 +112,11 @@ end
         p = randperm(n)
         p′ = collect(1:bitsize(T))
         p′[1:n] = p′[p]
-        net = BenesNetwork{T}(p)
+        backend = BenesNetwork{T}(p)
         for _ in 1:100
             x = rand(T)
-            @test bitstr(x)[p′] === bitstr(@inferred bitpermute(x, net))
-            @test bitstr(x)[invperm(p′)] === bitstr(@inferred invbitpermute(x, net))
+            @test bitstr(x)[p′] === bitstr(@inferred bitpermute(x, backend))
+            @test bitstr(x)[invperm(p′)] === bitstr(@inferred invbitpermute(x, backend))
         end
     end
 end
@@ -127,11 +127,11 @@ end
         p = randperm(n)
         p′ = collect(1:bitsize(T))
         p′[1:n] = p′[p]
-        net = GRPNetwork{T}(p)
+        backend = GRPNetwork{T}(p)
         for _ in 1:100
             x = rand(T)
-            @test bitstr(x)[p′] === bitstr(@inferred bitpermute(x, net))
-            @test bitstr(x)[invperm(p′)] === bitstr(@inferred invbitpermute(x, net))
+            @test bitstr(x)[p′] === bitstr(@inferred bitpermute(x, backend))
+            @test bitstr(x)[invperm(p′)] === bitstr(@inferred invbitpermute(x, backend))
         end
     end
 end
@@ -142,11 +142,11 @@ end
         p = randperm(n)
         p′ = collect(1:bitsize(T))
         p′[1:n] = p′[p]
-        net = AVXCopyGather{T}(p)
+        backend = AVXCopyGather{T}(p)
         for _ in 1:100
             x = rand(T)
-            @test bitstr(x)[p′] === bitstr(@inferred bitpermute(x, net))
-            @test bitstr(x)[invperm(p′)] === bitstr(@inferred invbitpermute(x, net))
+            @test bitstr(x)[p′] === bitstr(@inferred bitpermute(x, backend))
+            @test bitstr(x)[invperm(p′)] === bitstr(@inferred invbitpermute(x, backend))
         end
     end
 end
@@ -156,8 +156,8 @@ end
 
     backends = [BenesNetwork, GRPNetwork, AVXCopyGather]
 
-    @testset "$backend_type" for backend_type in backends
-        P = BitPermutation{T}(p₀; type=backend_type)
+    @testset "$backend" for backend in backends
+        P = BitPermutation{T}(p₀; backend)
 
         # Make sure printing returns something
         buf = IOBuffer()
@@ -174,13 +174,12 @@ end
         @test sign(P) === sign(P') === 1
 
         # Test conversion to `Vector`
-        @test Vector(P) == p₀
-        @test Vector(P') == invperm(p₀)
+        @test Vector(P) == p₀ && Vector(P') == invperm(p₀)
 
         # Test random permutations
         for _ in 1:10
             p = randperm(bitsize(T))
-            P = BitPermutation{T}(p; type=backend_type)
+            P = BitPermutation{T}(p; backend)
 
             for _ in 1:20
                 x = rand(T)
@@ -195,7 +194,7 @@ end
         # Test permutations of arrays
         for _ in 1:10
             p = randperm(bitsize(T))
-            P = BitPermutation{T}(p; type=backend_type)
+            P = BitPermutation{T}(p; backend)
 
             arr = rand(T, 1000)
             arr_copy = copy(arr)
@@ -224,7 +223,7 @@ end
 @testset "BitPermutation{$T}" for T in custom_types
     p = randperm(bitsize(T))
     # Rearranging takes too long 
-    P = BitPermutation{T}(p; type=BenesNetwork, rearrange=false)
+    P = BitPermutation{T}(p; backend=BenesNetwork, rearrange=false)
 
     for _ in 1:100
         x = rand(T)
@@ -236,7 +235,7 @@ end
     # Test permutations of arrays
     for _ in 1:10
         p = randperm(bitsize(T))
-        P = BitPermutation{T}(p; type=BenesNetwork, rearrange=false)
+        P = BitPermutation{T}(p; backend=BenesNetwork, rearrange=false)
         arr = rand(T, 1000)
         arr_copy = copy(arr)
         @test P.(arr) == bitpermute.(arr, P) == invbitpermute.(arr, P') == [bitpermute(x, P) for x in arr]
