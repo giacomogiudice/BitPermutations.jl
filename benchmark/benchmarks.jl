@@ -11,16 +11,15 @@ Random.seed!(42)
 # Struct in which to save benchmark results
 suite = BenchmarkGroup()
 test_types = (UInt8, UInt16, UInt32, UInt64, UInt128)
-avx_types = (UInt16, UInt32, UInt64)
 N = 10_000
 
 # Generate results for benchmarking bit permutations on a single bitstring of type `T`
 suite["Single"] = BenchmarkGroup()
 
 rand_perm(::Type{T}) where {T} = randperm(bitsize(T))
-benes_perm(::Type{T}) where {T} = BitPermutation{T}(randperm(bitsize(T)); type=BenesNetwork)
-grp_perm(::Type{T}) where {T} = BitPermutation{T}(randperm(bitsize(T)); type=GRPNetwork)
-avx_perm(::Type{T}) where {T} = BitPermutation{T}(randperm(bitsize(T)); type=AVXCopyGather)
+benes_perm(::Type{T}) where {T} = BitPermutation{T}(randperm(bitsize(T)); backend=BenesNetwork)
+grp_perm(::Type{T}) where {T} = BitPermutation{T}(randperm(bitsize(T)); backend=GRPNetwork)
+avx_perm(::Type{T}) where {T} = BitPermutation{T}(randperm(bitsize(T)); backend=AVXCopyGather)
 
 for T in test_types
     group = suite["Single"][T] = BenchmarkGroup()
@@ -61,7 +60,6 @@ for T in test_types
         x = rand($T)
         p = grp_perm($T)
     end
-    T in avx_types || continue
     group["AVXCopyGather"] = @benchmarkable begin
         @inbounds for _ in 1:($N)
             x = bitpermute(x, p)
@@ -100,7 +98,6 @@ for T in test_types
         xs = rand($T, $N)
         p = grp_perm($T)
     end
-    T in avx_types || continue
     group["AVXCopyGather"] = @benchmarkable bitpermute!(xs, p) setup = begin
         xs = rand($T, $N)
         p = avx_perm($T)
