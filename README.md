@@ -142,19 +142,21 @@ Your mileage may vary, especially depending on whether or not the array fits in 
 The full benchmark routine can be found in `benchmark/benchmarks.jl`, while the script for plotting the results is `benchmark/plot.jl`.
 
 
-## Details
+## Backends
 
-For a more in-depth explanation, the wonderful [https://programming.sirrida.de/bit_perm.html](https://programming.sirrida.de/bit_perm.html) is well worth reading.
+For a more in-depth introduction to performing bit permutations, the wonderful [https://programming.sirrida.de/bit_perm.html](https://programming.sirrida.de/bit_perm.html) is well worth reading.
 
-Three different ways are performing the permutation are implemented: rearranged **Beneš networks**, **GRP networks**, and **AVX-512 bit shuffles**.
+Three different backends to perform the permutation are implemented: rearranged **Beneš networks**, **GRP networks**, and **AVX-512 bit shuffles**.
 The latter two are faster only because they exploit CPU instrisics, special operations that are available on certain x86-64 processors, in particular the [AVX-512](https://en.wikipedia.org/wiki/AVX-512) and [BMI2](https://en.wikipedia.org/wiki/X86_Bit_manipulation_instruction_set) instruction set.
 If the AVX-512 instruction set is detected, a `AVXCopyGather{T}` is used by default if `T` is 16, 32, or 64 bits long.
 Otherwise, if the BMI2 instruction set is detected, and `T` is 32 or 64 bits long, a `GRPNetwork{T}` is chosen
-For all other cases, the default chouse is `BenesNetwork{T}`.
-The algorithm can be chosen manually when constructing the permutation, for example
+For all other cases, the default choice is a `BenesNetwork{T}`.
+The backend can be chosen manually when constructing the permutation, for example
+
 ```julia 
-p = BitPermutation{UInt32}(v; type=GRPNetwork)
+p = BitPermutation{UInt32}(v; backend=GRPNetwork)
 ```
+
 Using intrinsics can be disabled by setting `ENV["BIT_PERMUTATIONS_USE_INTRINSICS"] = false` before loading the package or setting
 
 ```bash
