@@ -58,8 +58,9 @@ end
 function Base.setindex!(m::Bits{T}, x, i::Int) where {T}
     @boundscheck checkbounds(m, i)
     a = chunk(m)
-    u = one(T) << shift_safe(T, i - 1)
-    m.chunk = convert(Bool, x) ? a | u : a & ~u
+    v = convert(T, convert(Bool, x))
+    s = shift_safe(T, i - 1)
+    m.chunk = (a & ~(one(T) << s)) | (v << s)
     return m
 end
 

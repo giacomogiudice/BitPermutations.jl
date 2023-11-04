@@ -8,15 +8,21 @@ on:
 
 jobs:
   build:
-    name: Julia ${{ matrix.julia-version }} - ${{ matrix.julia-arch }}
+    name: Julia ${{ matrix.julia-version }} | ${{ matrix.os }} | ${{ matrix.julia-arch }}
     needs: style-check
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.julia-version == 'nightly' }}
     strategy:
       fail-fast: false
       matrix:
-        julia-version: ['1.5','1.6','1.9','nightly'] # earliest, lts, stable, nightly
-        julia-arch: [x64, x86]
+        julia-version: ['1.6','1.9','nightly'] # lts, stable, nightly
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        julia-arch: ['x64', 'x86']
+        exclude:
+          - os: windows-latest
+            julia-arch: x86
+          - os: macos-latest
+            julia-arch: x86
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -26,6 +32,10 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
           arch: ${{ matrix.julia-arch }}
+          show-versioninfo: true
+      
+      - name: Cache
+        uses: julia-actions/cache@v1
 
       - name: Build package
         uses: julia-actions/julia-buildpkg@v1
@@ -53,7 +63,10 @@ jobs:
       - name: Setup Julia
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.8'
+          version: '1.9'
+
+      - name: Cache
+        uses: julia-actions/cache@v1
 
       - name: Run JuliaFormatter
         run: |

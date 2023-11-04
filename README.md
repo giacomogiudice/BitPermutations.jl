@@ -96,7 +96,7 @@ As usual, if you do not need the original vector after the permutation step, the
 ## Benchmarks
 
 The functionalities mentioned above are best summarized in the plot below.
-The results were obtained on an Intel Caskadelake processor running Julia 1.8.1 on a single thread.
+The results were obtained on an Intel Icelake processor running Julia 1.9.2 with `--threads=1 --optimize=3 --check-bounds=no`.
 
 <p align="center">
   <img src="./benchmark/results.svg" alt="Benchmark results" width=960/>
@@ -122,17 +122,19 @@ bitpermute!(p, xs)
 In both cases we choose `N = 10_000`, and divide the median execution time by `N`.
 Considering single permutations, Beneš networks are consistently faster than doing naïve permutations of `BitVector`s by a factor of 10, approximately.
 As discussed later on, for types `UInt32` and `UInt64`, choosing a `GRPNetwork` can lead to significant speedups on processors which support BMI2 instructions.
-Indeed, this leads to a speedup of around 20-30 compared to `BitVector`s, since it exploits advanced processor intrinsincs at each stage.
+Indeed, this leads to a speedup of around 20 compared to `BitVector`s, since it exploits advanced processor intrinsincs at each stage.
 For other types however, the fallback implementation of these primitive operations is rather slow and should be avoided.
+If you're lucky enough to have AVX-512 intrinsics available on your processor, then using the `AVXCopyGather` is the method of choice for `UInt16`, `UInt32` and `UInt64`, since it can perform arbitrary permutations in a few nanoseconds.
 
 This benchmark was performed for random permutations, and is somewhat of a worst-case scenario, since each of these network has typically the most number of stages.
 If your permutations are not completely random but have some structure, it is possible that you might achieve even larger speedups.
 
 The most dramatic speedup are, however, for array-wise permutations.
-In this case a `BenesNetwork` can permute bitstrings in a couple nanoseconds, yielding speedups of more than two orders of magnitude (more than 120 and 150 for `UInt32` and `UInt64`, respectively).
+In this case a `BenesNetwork` can permute bitstrings in a couple nanoseconds, yielding speedups of more than two orders of magnitude.
 This is because the order of the operations is rearranged: the single layers of the network are not applied in sequence for each bit string, but are applied globally on each element.
 This allows the processor to do the same operation over and over again, and potentially even use AVX instructions (although the same speedups are observed on Apple silicon).
-It is unclear why the `GRPNetwork` is not faster than `BenesNetwork` for `UInt32` and `UInt64`  in this case, but I also do not know how to investigate this.
+I am unsure why the `GRPNetwork` is not faster than `BenesNetwork` for `UInt32` and `UInt64`: I believe the reason is that the compiler uses AVX instructions, but the PDEP/PEXT intrisics are not vectorized.
+The `AVXCopyGather` algorithm does not have a drastic improvement using broadcasting, since the single permutation is already exploiting vectorized operations, but it remains competitive compared to the other algorithms. 
 For `UInt128`, the bitstrings exceed the processor word size, and everything is a bit slower.
 The speedup will also depend on the choice of `N`.
 Your mileage may vary, especially depending on whether or not the array fits in cache. 
@@ -140,17 +142,25 @@ Your mileage may vary, especially depending on whether or not the array fits in 
 The full benchmark routine can be found in `benchmark/benchmarks.jl`, while the script for plotting the results is `benchmark/plot.jl`.
 
 
-## Details
+## Backends
 
-For a more in-depth explanation, the wonderful [https://programming.sirrida.de/bit_perm.html](https://programming.sirrida.de/bit_perm.html) is well worth reading.
+For a more in-depth introduction to performing bit permutations, the wonderful [https://programming.sirrida.de/bit_perm.html](https://programming.sirrida.de/bit_perm.html) is well worth reading.
 
-Two different ways are performing the permutation are implemented: rearranged **Beneš networks** and **GRP networks**.
-The latter is only faster on CPUs which support the [BMI2](https://en.wikipedia.org/wiki/X86_Bit_manipulation_instruction_set) instruction set.
-Hence, the permutation is constructed using a `BenesNetwork{T}`, unless `T<:Union{UInt32,UInt64}` and BMI2 instructions are supported, in which case it uses a `GRPNetwork{T}`.
-BMI2 intrinsics can be disabled by setting `ENV["BP_USE_BMI2"] = false` before loading the package or setting
+Three different backends to perform the permutation are implemented: rearranged **Beneš networks**, **GRP networks**, and **AVX-512 bit shuffles**.
+The latter two are faster only because they exploit CPU instrisics, special operations that are available on certain x86-64 processors, in particular the [AVX-512](https://en.wikipedia.org/wiki/AVX-512) and [BMI2](https://en.wikipedia.org/wiki/X86_Bit_manipulation_instruction_set) instruction set.
+If the AVX-512 instruction set is detected, a `AVXCopyGather{T}` is used by default if `T` is 16, 32, or 64 bits long.
+Otherwise, if the BMI2 instruction set is detected, and `T` is 32 or 64 bits long, a `GRPNetwork{T}` is chosen
+For all other cases, the default choice is a `BenesNetwork{T}`.
+The backend can be chosen manually when constructing the permutation, for example
+
+```julia 
+p = BitPermutation{UInt32}(v; backend=GRPNetwork)
+```
+
+Using intrinsics can be disabled by setting `ENV["BIT_PERMUTATIONS_USE_INTRINSICS"] = false` before loading the package or setting
 
 ```bash
-export BP_USE_BMI2=false
+export BIT_PERMUTATIONS_USE_INTRINSICS=false
 ```
 
 before launching Julia.
@@ -181,11 +191,21 @@ This can be disabled by passing the keyword argument `rearrage=false` to the con
 
 GRP networks work in a similar way to Beneš network, except that each layer is a different reshuffling, known as *GRP* or [sheeps-and-goats](https://programming.sirrida.de/bit_perm.html#sag) (see also TAOCP).
 GRP networks are typically shallower, but the reshuffling operation is only efficient if specific instructions are available in hardware, as they can be performed in 8 cycles.
-The [PEXT/PDEP](https://www.chessprogramming.org/BMI2) instructions used for the GRP reshuffling is supported by Intel starting from the Haswell architecture (released in 2013) and by AMD from the Zen 3 architecture (released in 2020).
+The [PEXT/PDEP](https://www.chessprogramming.org/BMI2) instructions used for the GRP reshuffling is supported by Intel starting from the Haswell processors (released in 2013) and by AMD from the Zen 3 generation (released in 2020).
 On older AMD architectures, PEXT/PDEP is implemented in microcode and are reportedly slower.
-On such machines you may want to experiment which method is faster and possibly disable calls to BMI2 with `ENV["PB_USE_BMI2"] = false`.
+On such machines you may want to experiment which method is faster and possibly disable calls to BMI2 with `ENV["BIT_PERMUTATIONS_USE_INTRINSICS"] = false`.
 Fallback operations are implemented but are typically much slower then butterfly operations.
 The construction of the masks follows the algorithm in: R. Lee, Z. Shi, X. Yang, *Efficient permutation instructions for fast software cryptography*, [IEEE Micro](https://doi.org/10.1109/40.977759) (2001); which is well explained [here](https://programming.sirrida.de/bit_perm.html#lee_sag).
+
+
+### AVX-512 bit shuffles
+
+As mentioned in [this blog post](https://lemire.me/blog/2023/06/29/dynamic-bit-shuffle-using-avx-512/), new x86-64 processors have very powerful built-in instructions that can perform arbitrary bit shuffles.
+These types of operations exploit SIMD-vectorized operations on 128-, 256-, or 512-bit registers.
+By duplicating the data to permute, we can then extract the bits we need using a mask.
+Despite the copying overhead, this turns out to be the fastest options for `UInt16`, `UInt32` and `UInt64`.
+Unfortunately such operations are consistently available only from Intel's Icelake generation (starting from 2019). 
+
 
 ## Enhancements
 
@@ -202,4 +222,4 @@ Here I just list the first ones off the top of my head:
 
 ## Compatibility
 
-This package is compatible with Julia 1.5 and above.
+This package is compatible with Julia 1.6 and above.

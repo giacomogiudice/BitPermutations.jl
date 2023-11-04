@@ -1,9 +1,35 @@
 """
-    PermutationNetwork{T}
+    PermutationBackend{T}
 
-Abstract type for all bit-permutation algorithms.
+Abstract type for all bit-permutation backends.
 """
-abstract type PermutationNetwork{T} end
+abstract type PermutationBackend{T} end
+
+# Fallback implementation for arrays
+function bitpermute_elementwise(x::AbstractArray{T}, backend::PermutationBackend{T}) where {T}
+    return _fallback_bitpermute_elementwise!(bitpermute, similar(x), x, backend)
+end
+
+function bitpermute_elementwise!(x::AbstractArray{T}, backend::PermutationBackend{T}) where {T}
+    return _fallback_bitpermute_elementwise!(bitpermute, x, x, backend)
+end
+
+function invbitpermute_elementwise(x::AbstractArray{T}, backend::PermutationBackend{T}) where {T}
+    return _fallback_bitpermute_elementwise!(invbitpermute, similar(x), x, backend)
+end
+
+function invbitpermute_elementwise!(x::AbstractArray{T}, backend::PermutationBackend{T}) where {T}
+    return _fallback_bitpermute_elementwise!(invbitpermute, x, x, backend)
+end
+
+@inline function _fallback_bitpermute_elementwise!(
+    op::Function, y::AbstractArray{T}, x::AbstractArray{T}, backend::PermutationBackend{T}
+) where {T}
+    @simd for i in eachindex(x)
+        @inbounds y[i] = op(x[i], backend)
+    end
+    return y
+end
 
 """
     BenesNetwork{T}
@@ -11,7 +37,7 @@ abstract type PermutationNetwork{T} end
 Represents a Beneš network, which is a series of `deltaswap` operations with specified shifts and
 masks.
 """
-struct BenesNetwork{T} <: PermutationNetwork{T}
+struct BenesNetwork{T} <: PermutationBackend{T}
     params::Vector{Tuple{T,Int}}
 end
 
@@ -179,7 +205,7 @@ Base.show(io::IO, net::BenesNetwork) = print(io, "$(typeof(net)) with $(length(n
 
 Represents a GRP network, which is a series of `grpswap` operations with specified shifts and masks.
 """
-struct GRPNetwork{T} <: PermutationNetwork{T}
+struct GRPNetwork{T} <: PermutationBackend{T}
     params::Vector{Tuple{T,Int,T}}
 end
 
@@ -286,3 +312,39 @@ for (Network, invswap) in (BenesNetwork => deltaswap, GRPNetwork => invgrpswap)
         end
     end
 end
+
+"""
+    AVXCopyGather{T}
+
+A permutation backend which uses AVX-512 intrisics to perform a permutation on 16-, 32-, or 64-bit
+long integers.
+The input data is copied several times to fill an AVX register, and then a special operation
+extracts data from it using a mask.
+Internally, it stores precomputed masks for the forward and backward permutation.
+"""
+struct AVXCopyGather{T,W} <: PermutationBackend{T}
+    m::Vec{W,UInt8}
+    m̄::Vec{W,UInt8}
+end
+
+function AVXCopyGather{T}(perm::AbstractVector{Int}) where {T}
+    n = length(perm)
+    W = bitsize(T)
+    n ≤ bitsize(T) || throw(OverflowError("Permutation is too long for Type $T"))
+    isperm(perm) || throw(ArgumentError("Input vector is not a permutation"))
+    USE_AVX512 || @warn "Not using AVX-512 instructions, performance may be limited" maxlog = 1
+
+    # Pad permutation vector
+    perm = [collect(perm); (n + 1):bitsize(T)]
+
+    # Convert permutation to mask
+    m = Vec{W,UInt8}(ntuple(i -> UInt8(perm[i] - 1), W))
+    m̄ = Vec{W,UInt8}(ntuple(i -> UInt8(findfirst(==(i), perm) - 1), W))
+    return AVXCopyGather{T,W}(m, m̄)
+end
+
+Base.show(io::IO, backend::AVXCopyGather{T}) where {T} = print(io, "AVXCopyGather{$T}($(backend.m), $(backend.m̄))")
+
+bitpermute(x::T, backend::AVXCopyGather{T}) where {T} = avx_bit_shuffle(x, backend.m)
+
+invbitpermute(x::T, backend::AVXCopyGather{T}) where {T} = avx_bit_shuffle(x, backend.m̄)
