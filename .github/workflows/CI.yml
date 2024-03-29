@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        julia-version: ['1.6','1.9','nightly'] # lts, stable, nightly
+        julia-version: ['1.6','1.10','nightly'] # lts, stable, nightly
         os: [ubuntu-latest, windows-latest, macos-latest]
         julia-arch: ['x64', 'x86']
         exclude:
@@ -25,7 +25,7 @@ jobs:
             julia-arch: x86
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Julia
         uses: julia-actions/setup-julia@v1
@@ -47,7 +47,7 @@ jobs:
         uses: julia-actions/julia-processcoverage@v1
         
       - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           files: lcov.info
         env:
@@ -58,12 +58,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Julia
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.9'
+          version: '1.10'
 
       - name: Cache
         uses: julia-actions/cache@v1
