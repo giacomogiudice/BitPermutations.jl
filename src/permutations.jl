@@ -76,39 +76,38 @@ function Base.broadcasted(::typeof(invbitpermute), x::AbstractArray{T}, P::Abstr
 end
 
 """
-    BitPermutation{T,A}
+    BitPermutation{T,B}
 
-Represents a bit permutation of type `T`, performed with a `PermutationBackend` of type `A`.
+Represents a bit permutation of type `T`, performed with a `PermutationBackend` of type `B`.
 """
 struct BitPermutation{T,B<:PermutationBackend{T}} <: AbstractBitPermutation{T}
     vector::Vector{Int}
     backend::B
-
-    function BitPermutation{T}(perm::Vector{Int}, backend::B) where {T,B<:PermutationBackend{T}}
-        return new{T,B}(perm, backend)
-    end
 end
 
 """
-    BitPermutation{T}(p::AbstractVector{Int}; backend=[DEFAULT_TYPE], [...])
+    BitPermutation{T}([backend_type], p::AbstractVector{Int}; [...])
 
 Construct a `BitPermutation{T}` from permutation vector `p`.
-The backend that actually performs the permutation can be specified by the `backend` keyword argument.
-The `backend` defaults to the following:
+The backend that actually performs the permutation can be optionally specified by providing a
+`backend_type` (`<:PermutationBackend`).
+It defaults to the following:
 
-  - if AVX-512 instrinsics are available, an `AVXCopyGather` is chosen for `T<:Union{UInt16,UInt32,UInt64}`;
-  - if BMI2 instrinsics are available, a `GRPNetwork` is chose for `T<:Union{UInt32,UInt64}`;
+  - if AVX-512 instrinsics are available, `AVXCopyGather` is chosen for `T<:Union{UInt16,UInt32,UInt64}`;
+  - if BMI2 instrinsics are available, `GRPNetwork` is chosen for `T<:Union{UInt32,UInt64}`;
   - In all other cases, `BenesNetwork` is used.
 
 Extra keyword arguments get passed to the backend.
 
-See also: [`BenesNetwork`](@ref), [`GRPNetwork`](@ref).
+See also: [`BenesNetwork`](@ref), [`GRPNetwork`](@ref), [`AVXCopyGather`](@ref).
 """
-function BitPermutation{T}(p::AbstractVector{Int}; backend::Type=_default_backend(T), kwargs...) where {T}
+function BitPermutation{T}(::Type{B}, p::AbstractVector{Int}; kwargs...) where {T,B<:PermutationBackend}
     perm = collect(p)
-    backend = (backend){T}(perm; kwargs...)
-    return BitPermutation{T}(perm, backend)
+    backend = (B){T}(perm; kwargs...)
+    return BitPermutation{T,typeof(backend)}(perm, backend)
 end
+
+BitPermutation{T}(p::AbstractVector{Int}; kwargs...) where {T} = BitPermutation{T}(_default_backend(T), p; kwargs...)
 
 _default_backend(::Type{T}) where {T<:UInt16} = ifelse(USE_AVX512, AVXCopyGather, BenesNetwork)
 

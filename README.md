@@ -154,7 +154,7 @@ For all other cases, the default choice is a `BenesNetwork{T}`.
 The backend can be chosen manually when constructing the permutation, for example
 
 ```julia 
-p = BitPermutation{UInt32}(v; backend=GRPNetwork)
+p = BitPermutation{UInt32}(GRPNetwork, v)
 ```
 
 Using intrinsics can be disabled by setting `ENV["BIT_PERMUTATIONS_USE_INTRINSICS"] = false` before loading the package or setting
