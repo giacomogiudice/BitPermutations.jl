@@ -17,9 +17,9 @@ N = 10_000
 suite["Single"] = BenchmarkGroup()
 
 rand_perm(::Type{T}) where {T} = randperm(bitsize(T))
-benes_perm(::Type{T}) where {T} = BitPermutation{T}(randperm(bitsize(T)); backend=BenesNetwork)
-grp_perm(::Type{T}) where {T} = BitPermutation{T}(randperm(bitsize(T)); backend=GRPNetwork)
-avx_perm(::Type{T}) where {T} = BitPermutation{T}(randperm(bitsize(T)); backend=AVXCopyGather)
+benes_perm(::Type{T}) where {T} = BitPermutation{T}(BenesNetwork, randperm(bitsize(T)))
+grp_perm(::Type{T}) where {T} = BitPermutation{T}(GRPNetwork, randperm(bitsize(T)))
+avx_perm(::Type{T}) where {T} = BitPermutation{T}(AVXCopyGather, randperm(bitsize(T)))
 
 for T in test_types
     group = suite["Single"][T] = BenchmarkGroup()
