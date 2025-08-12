@@ -151,6 +151,7 @@ struct AdjointBitPermutation{T,P<:AbstractBitPermutation{T}} <: AbstractBitPermu
 end
 
 Base.adjoint(perm::AbstractBitPermutation) = AdjointBitPermutation(perm)
+Base.adjoint(perm::AdjointBitPermutation) = perm.parent
 
 bitpermute(x::Number, P::AdjointBitPermutation) = invbitpermute(x, P.parent)
 invbitpermute(x::Number, P::AdjointBitPermutation) = bitpermute(x, P.parent)
