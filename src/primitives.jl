@@ -137,7 +137,7 @@ The `AbstractArray` version is not optimized to be fast.
 
 See also [`invgrpswap`](@ref).
 """
-function grpswap(x::T, m::T, shift::Integer=count_zeros(m), m̄::T=~m) where {T<:Unsigned}
+function grpswap(x::T, m::T, shift::Integer=count_zeros(m), m̄::T=(~m)) where {T<:Unsigned}
     shift = shift_safe(T, shift)
     return pext(x, m) << shift | pext(x, m̄)
 end
@@ -155,7 +155,7 @@ Performs the inverse operation of `grpswap`.
 
 See also [`grpswap`](@ref).
 """
-function invgrpswap(x::T, m::T, shift::Integer=count_zeros(m), m̄::T=~m) where {T<:Unsigned}
+function invgrpswap(x::T, m::T, shift::Integer=count_zeros(m), m̄::T=(~m)) where {T<:Unsigned}
     shift = shift_safe(T, shift)
     return pdep(x >> shift, m) | pdep(x, m̄)
 end
