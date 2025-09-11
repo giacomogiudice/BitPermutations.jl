@@ -180,6 +180,9 @@ end
         # Test conversion to `Vector`
         @test Vector(P) == p₀ && Vector(P') == invperm(p₀)
 
+        # Test that adjoint is self-inverse
+        @test P == P''
+
         # Test random permutations
         for _ in 1:10
             p = randperm(bitsize(T))
