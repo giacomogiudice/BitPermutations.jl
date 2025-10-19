@@ -2,22 +2,11 @@ using Base.BinaryPlatforms: CPUID
 using Base: llvmcall
 using SIMD: LVec
 
-"""
-    use_bmi2()
+_has_bmi2() = Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_bmi2)
+_has_avx512() = Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_avx512bitalg)
 
-Used to set `USE_BMI2` flag at package initialization.
-"""
-use_bmi2() = Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_bmi2)
-
-"""
-    use_avx512()
-
-Used to set `USE_AVX512` flag at package initialization.
-"""
-use_avx512() = Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_avx512bitalg)
-
-const USE_BMI2::Bool = @load_preference("use_bmi2", false)
-const USE_AVX512::Bool = @load_preference("use_avx512", false)
+const USE_BMI2 = @load_preference("use_bmi2", _has_bmi2())::Bool
+const USE_AVX512 = @load_preference("use_avx512", _has_avx512())::Bool
 
 """
     bitsize(::Type{T})
