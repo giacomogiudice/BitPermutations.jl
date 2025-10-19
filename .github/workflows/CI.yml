@@ -63,7 +63,7 @@ jobs:
       - name: Setup Julia
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.12'
+          version: '1' # Latest stable version
 
       - name: Cache
         uses: julia-actions/cache@v1
