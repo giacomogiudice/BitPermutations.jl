@@ -2,30 +2,22 @@ using Base.BinaryPlatforms: CPUID
 using Base: llvmcall
 using SIMD: LVec
 
-const ENV_KEY = "BIT_PERMUTATIONS_USE_INTRINSICS"
-
 """
     use_bmi2()
 
-Used to set `USE_BMI2` flag at precompilation.
+Used to set `USE_BMI2` flag at package initialization.
 """
-function use_bmi2()
-    haskey(ENV, ENV_KEY) && return parse(Bool, ENV[ENV_KEY])
-    return Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_bmi2)
-end
+use_bmi2() = Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_bmi2)
 
 """
     use_avx512()
 
-Used to set `USE_AVX512` flag at precompilation.
+Used to set `USE_AVX512` flag at package initialization.
 """
-function use_avx512()
-    haskey(ENV, ENV_KEY) && return parse(Bool, ENV[ENV_KEY])
-    return Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_avx512bitalg)
-end
+use_avx512() = Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_avx512bitalg)
 
-const USE_BMI2 = use_bmi2()
-const USE_AVX512 = use_avx512()
+const USE_BMI2::Bool = @load_preference("use_bmi2", false)
+const USE_AVX512::Bool = @load_preference("use_avx512", false)
 
 """
     bitsize(::Type{T})
