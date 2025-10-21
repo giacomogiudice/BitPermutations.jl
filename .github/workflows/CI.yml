@@ -79,5 +79,5 @@ jobs:
           using Aqua
           @eval using $name
           Aqua.test_all(@eval $name; ambiguities=false, unbound_args=false, undefined_exports=false, project_extras=false, stale_deps=false, deps_compat=false, piracies=false, persistent_tasks=true)
-        shell: julia --color=yes --compiled-modules=no --optimize=0 {0}
+        shell: julia --color=yes {0}
 

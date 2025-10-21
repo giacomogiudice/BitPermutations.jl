@@ -12,11 +12,11 @@ Random.seed!(42)
 bitstr(x) = reverse(bitstring(x))
 
 # Check if using instrinsics
-@info """
-ENV[\"BIT_PERMUTATIONS_USE_INTRINSICS\"] = $(get(ENV, "BIT_PERMUTATIONS_USE_INTRINSICS", nothing))
-USE_BMI2 = $(USE_BMI2)
-USE_AVX512 = $(USE_AVX512)
-"""
+# @info """
+# ENV[\"BIT_PERMUTATIONS_USE_INTRINSICS\"] = $(get(ENV, "BIT_PERMUTATIONS_USE_INTRINSICS", nothing))
+# USE_BMI2 = $(USE_BMI2)
+# USE_AVX512 = $(USE_AVX512)
+# """
 
 # # Test types from Base
 # base_types = (UInt8, UInt16, UInt32, UInt64, UInt128)
