@@ -2,7 +2,6 @@ using Base.BinaryPlatforms: CPUID
 using Base: llvmcall
 using SIMD: LVec
 
-
 const ENV_KEY = "BIT_PERMUTATIONS_USE_INTRINSICS"
 
 """
