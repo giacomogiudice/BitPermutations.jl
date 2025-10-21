@@ -13,7 +13,7 @@ export cycles, order
 
 include("primitives.jl")
 include("bitarrays.jl")
-include("backends.jl")
-include("permutations.jl")
+# include("backends.jl")
+# include("permutations.jl")
 
 end # module

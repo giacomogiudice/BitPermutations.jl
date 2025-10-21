@@ -23,8 +23,8 @@ function use_avx512()
     return Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_avx512bitalg)
 end
 
-const USE_BMI2 = use_bmi2()
-const USE_AVX512 = use_avx512()
+const USE_BMI2 = false
+const USE_AVX512 = false
 
 """
     bitsize(::Type{T})
