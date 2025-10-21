@@ -1,5 +1,7 @@
 using Base.BinaryPlatforms: CPUID
 using Base: llvmcall
+using SIMD: LVec
+
 
 const ENV_KEY = "BIT_PERMUTATIONS_USE_INTRINSICS"
 
@@ -181,18 +183,19 @@ end
 
 avx_bit_shuffle(x::T, m::Vec{W,UInt8}) where {T<:Unsigned,W} = _avx_bit_shuffle_fallback(x, m)
 
-const LLVM_TYPES = Dict(UInt8 => "i8", UInt16 => "i16", UInt32 => "i32", UInt64 => "i64")
-
 @generated function _avx_bit_shuffle(x::T, mask::Vec{W,UInt8}) where {T<:Union{UInt16,UInt32,UInt64},W}
     @assert USE_AVX512 || error("AVX512 instructions are not supported on this processor.")
     # `W` is the size of the each block, `N` is the total number of bits in the SIMD register
     @assert W == bitsize(T)
     N = 8 * W
-    R = LLVM_TYPES[T]
+    # LLVM types are available in a dictionary in the `SIMD` package
+    R = SIMD.Intrinsics.d[T]
     # Use `vpshufbitqmb` intrisic to perform the permutation, adapted from 
     # https://lemire.me/blog/2023/06/29/dynamic-bit-shuffle-using-avx-512/
+    # See also
+    # https://discourse.julialang.org/t/calling-avx-512-intrinsics-from-julia/101079
     decl = """
-        define $R @bit_shuffle(<$W x i8> %a, <$W x i8> %b) {
+        define $R @bit_shuffle_$N(<$W x i8> %a, <$W x i8> %b) {
             %mask = call <$W x i1> @llvm.x86.avx512.vpshufbitqmb.$N(<$W x i8> %a, <$W x i8> %b)
             %res = bitcast <$W x i1> %mask to $R
             ret $R %res
@@ -200,13 +203,13 @@ const LLVM_TYPES = Dict(UInt8 => "i8", UInt16 => "i16", UInt32 => "i32", UInt64 
 
        declare <$W x i1> @llvm.x86.avx512.vpshufbitqmb.$N(<$W x i8>, <$W x i8>)
     """
-    instr = "bit_shuffle"
+    instr = "bit_shuffle_$N"
 
     return quote
         # Copy value of `x` 8 times to fill SIMD register, reinterpret it to match LLVM definition
         rep = reinterpret(Vec{$W,UInt8}, Vec{8,$T}(x))
-        # Call intrinsic via LLVM API
-        llvmcall(($decl, $instr), $T, Tuple{Vec{$W,UInt8},Vec{$W,UInt8}}, rep, mask)
+        # Call intrinsic via LLVM (conversion to `SIMD.LVec{N,T} == NTuple{N,VecElement{T}}` now seems required)
+        llvmcall(($decl, $instr), $T, Tuple{LVec{$W,UInt8},LVec{$W,UInt8}}, rep.data, mask.data)
     end
 end
 
