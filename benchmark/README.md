@@ -8,5 +8,5 @@ julia --project --threads=1 --optimize=3 --check-bounds=no benchmark/benchmarks.
 
 To plot the results, run
 ```
-julia benchmark/plots.jl benchmark/data/results.json
+julia benchmark/plot.jl benchmark/data/results.json
 ```
