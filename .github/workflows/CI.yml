@@ -84,7 +84,7 @@ jobs:
             write(stdout, read(`git diff`, String))
             exit(1)
           end
-        shell: julia --color=yes --compiled-modules=no --optimize=0 {0}
+        shell: julia --color=yes --optimize=0 {0}
 
       - name: Build package
         uses: julia-actions/julia-buildpkg@v1
@@ -100,5 +100,5 @@ jobs:
           using Aqua
           @eval using $name
           Aqua.test_all(@eval $name)
-        shell: julia --color=yes --compiled-modules=no --optimize=0 {0}
+        shell: julia --color=yes --optimize=0 {0}
 
