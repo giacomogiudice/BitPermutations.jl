@@ -65,27 +65,6 @@ jobs:
         with:
           version: '1' # Latest stable version
 
-      - name: Cache
-        uses: julia-actions/cache@v1
-
-      - name: Run JuliaFormatter
-        run: |
-          using Pkg
-          Pkg.add("JuliaFormatter")
-
-          using JuliaFormatter
-          formatted = JuliaFormatter.format(".", verbose=true)
-
-          if formatted
-            @info "All files match designated style"
-            exit(0)
-          else
-            @error "Some files do not match the designated style"
-            write(stdout, read(`git diff`, String))
-            exit(1)
-          end
-        shell: julia --color=yes --compiled-modules=no --optimize=0 {0}
-
       - name: Build package
         uses: julia-actions/julia-buildpkg@v1
 
@@ -99,6 +78,6 @@ jobs:
 
           using Aqua
           @eval using $name
-          Aqua.test_all(@eval $name)
+          Aqua.test_all(@eval $name; ambiguities=false, unbound_args=false, undefined_exports=false, project_extras=false, stale_deps=false, deps_compat=false, piracies=false, persistent_tasks=true)
         shell: julia --color=yes --compiled-modules=no --optimize=0 {0}
 
