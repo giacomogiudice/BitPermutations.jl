@@ -1,5 +1,4 @@
 using BitPermutations
-using BitPermutations: USE_BMI2, USE_AVX512
 using BitPermutations: deltaswap, grpswap, invgrpswap
 using BitIntegers
 using Random
@@ -13,9 +12,8 @@ bitstr(x) = reverse(bitstring(x))
 
 # Check if using instrinsics
 @info """
-ENV[\"BIT_PERMUTATIONS_USE_INTRINSICS\"] = $(get(ENV, "BIT_PERMUTATIONS_USE_INTRINSICS", nothing))
-USE_BMI2 = $(USE_BMI2)
-USE_AVX512 = $(USE_AVX512)
+USE_BMI2 = $(BitPermutations.USE_BMI2)
+USE_AVX512 = $(BitPermutations.USE_AVX512)
 """
 
 # Test types from Base

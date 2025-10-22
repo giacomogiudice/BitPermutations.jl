@@ -2,30 +2,11 @@ using Base.BinaryPlatforms: CPUID
 using Base: llvmcall
 using SIMD: LVec
 
-const ENV_KEY = "BIT_PERMUTATIONS_USE_INTRINSICS"
+_has_bmi2() = Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_bmi2)
+_has_avx512() = Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_avx512bitalg)
 
-"""
-    use_bmi2()
-
-Used to set `USE_BMI2` flag at precompilation.
-"""
-function use_bmi2()
-    haskey(ENV, ENV_KEY) && return parse(Bool, ENV[ENV_KEY])
-    return Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_bmi2)
-end
-
-"""
-    use_avx512()
-
-Used to set `USE_AVX512` flag at precompilation.
-"""
-function use_avx512()
-    haskey(ENV, ENV_KEY) && return parse(Bool, ENV[ENV_KEY])
-    return Sys.ARCH == :x86_64 && CPUID.test_cpu_feature(CPUID.JL_X86_avx512bitalg)
-end
-
-const USE_BMI2 = use_bmi2()
-const USE_AVX512 = use_avx512()
+const USE_BMI2 = @load_preference("use_bmi2", _has_bmi2())::Bool
+const USE_AVX512 = @load_preference("use_avx512", _has_avx512())::Bool
 
 """
     bitsize(::Type{T})
@@ -84,7 +65,7 @@ Opposite operation of `pdep`.
 
 See also [`pext`](@ref).
 """
-pdep(x::T, m::T) where {T<:Union{UInt32,UInt64}} = USE_BMI2 ? _pdep(x, m) : _pdep_fallback(x, m)
+pdep(x::T, m::T) where {T<:Union{UInt32,UInt64}} = @static USE_BMI2 ? _pdep(x, m) : _pdep_fallback(x, m)
 pdep(x::T, m::T) where {T} = _pdep_fallback(x, m)
 
 """
@@ -95,7 +76,7 @@ Opposite operation of `pdep`.
 
 See also [`pdep`](@ref).
 """
-pext(x::T, m::T) where {T<:Union{UInt32,UInt64}} = USE_BMI2 ? _pext(x, m) : _pext_fallback(x, m)
+pext(x::T, m::T) where {T<:Union{UInt32,UInt64}} = @static USE_BMI2 ? _pext(x, m) : _pext_fallback(x, m)
 pext(x::T, m::T) where {T} = _pext_fallback(x, m)
 
 @inline _pdep(x::UInt32, m::UInt32) = ccall("llvm.x86.bmi.pdep.32", llvmcall, UInt32, (UInt32, UInt32), x, m)
@@ -177,7 +158,7 @@ Perform a bit-shuffle of the bits in `x` using AVX instructions.
 The mask `mask` stores the zero-based indices of the locations of each bit in the permuted vector.
 """
 function avx_bit_shuffle(x::T, m::Vec{W,UInt8}) where {T<:Union{UInt16,UInt32,UInt64},W}
-    return USE_AVX512 ? _avx_bit_shuffle(x, m) : _avx_bit_shuffle_fallback(x, m)
+    return @static USE_AVX512 ? _avx_bit_shuffle(x, m) : _avx_bit_shuffle_fallback(x, m)
 end
 
 avx_bit_shuffle(x::T, m::Vec{W,UInt8}) where {T<:Unsigned,W} = _avx_bit_shuffle_fallback(x, m)

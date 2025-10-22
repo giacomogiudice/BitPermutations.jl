@@ -1,6 +1,7 @@
 module BitPermutations
 
 using Combinatorics
+using Preferences
 using SIMD
 
 export Bits

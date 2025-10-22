@@ -157,13 +157,16 @@ The backend can be chosen manually when constructing the permutation, for exampl
 p = BitPermutation{UInt32}(GRPNetwork, v)
 ```
 
-Using intrinsics can be disabled by setting `ENV["BIT_PERMUTATIONS_USE_INTRINSICS"] = false` before loading the package or setting
+The use of specific intrinsics can be enabled or disabled with the `Preferences.jl` package as follows
 
-```bash
-export BIT_PERMUTATIONS_USE_INTRINSICS=false
+```julia
+using Preferences, BitPermutations
+
+set_preferences!(BitPermutations, "use_bmi2" => true, "use_avx512" => false; force=true)
 ```
 
-before launching Julia.
+This will create a `LocalPreferences.toml` file next to your current `Project.toml` file to store this setting in a persistent way.
+Restart Julia for the changes to take place.
 
 ### Beneš networks
 
@@ -193,7 +196,7 @@ GRP networks work in a similar way to Beneš network, except that each layer is 
 GRP networks are typically shallower, but the reshuffling operation is only efficient if specific instructions are available in hardware, as they can be performed in 8 cycles.
 The [PEXT/PDEP](https://www.chessprogramming.org/BMI2) instructions used for the GRP reshuffling is supported by Intel starting from the Haswell processors (released in 2013) and by AMD from the Zen 3 generation (released in 2020).
 On older AMD architectures, PEXT/PDEP is implemented in microcode and are reportedly slower.
-On such machines you may want to experiment which method is faster and possibly disable calls to BMI2 with `ENV["BIT_PERMUTATIONS_USE_INTRINSICS"] = false`.
+On such machines you may want to experiment which method is faster and possibly disable calls to BMI2.
 Fallback operations are implemented but are typically much slower then butterfly operations.
 The construction of the masks follows the algorithm in: R. Lee, Z. Shi, X. Yang, *Efficient permutation instructions for fast software cryptography*, [IEEE Micro](https://doi.org/10.1109/40.977759) (2001); which is well explained [here](https://programming.sirrida.de/bit_perm.html#lee_sag).
 
