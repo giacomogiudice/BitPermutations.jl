@@ -20,9 +20,9 @@ jobs:
         julia-arch: ['x64', 'x86']
         include:
           - os: 'windows-latest'
-            julia-arch: 'default'
+            julia-arch: 'x64'
           - os: 'macos-latest'
-            julia-arch: 'default'
+            julia-arch: 'aarch64'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
