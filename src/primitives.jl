@@ -98,11 +98,17 @@ See also [`pdep`](@ref).
 pext(x::T, m::T) where {T<:Union{UInt32,UInt64}} = USE_BMI2 ? _pext(x, m) : _pext_fallback(x, m)
 pext(x::T, m::T) where {T} = _pext_fallback(x, m)
 
-@inline _pdep(x::UInt32, m::UInt32) = ccall("llvm.x86.bmi.pdep.32", llvmcall, UInt32, (UInt32, UInt32), x, m)
-@inline _pdep(x::UInt64, m::UInt64) = ccall("llvm.x86.bmi.pdep.64", llvmcall, UInt64, (UInt64, UInt64), x, m)
-
-@inline _pext(x::UInt32, m::UInt32) = ccall("llvm.x86.bmi.pext.32", llvmcall, UInt32, (UInt32, UInt32), x, m)
-@inline _pext(x::UInt64, m::UInt64) = ccall("llvm.x86.bmi.pext.64", llvmcall, UInt64, (UInt64, UInt64), x, m)
+# LLVM 23 removed the x86-specific `llvm.x86.bmi.{pdep,pext}.*` intrinsics in favour of the
+# generic `llvm.{pdep,pext}.*`, which lower to PDEP/PEXT on BMI2 targets.
+for (T, N) in ((UInt32, 32), (UInt64, 64))
+    pdep_name, pext_name = if Base.libllvm_version >= v"23"
+        "llvm.pdep.i$N", "llvm.pext.i$N"
+    else
+        "llvm.x86.bmi.pdep.$N", "llvm.x86.bmi.pext.$N"
+    end
+    @eval @inline _pdep(x::$T, m::$T) = ccall($pdep_name, llvmcall, $T, ($T, $T), x, m)
+    @eval @inline _pext(x::$T, m::$T) = ccall($pext_name, llvmcall, $T, ($T, $T), x, m)
+end
 
 # Fallbacks adapted from https://www.chessprogramming.org/BMI2
 function _pdep_fallback(x::T, mask::T) where {T}
